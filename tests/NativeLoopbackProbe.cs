@@ -6,9 +6,9 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 
-namespace FileXfer.Probe;
+namespace Xfer.Probe;
 
-/// <summary>Sends a folder through FileXfer's own optical path with no screen and no camera: the QR frames the page
+/// <summary>Sends a folder through Xfer's own optical path with no screen and no camera: the QR frames the page
 /// shows (QrStream, drawn as ScaledQr images) are placed in camera-sized pictures and given to the desktop camera
 /// receiver, whose decoded files must equal the originals. Then the same with FX2 (Fx2Stream, Fx2Image), the camera
 /// seeing only the middle of the window and a new picture every second camera frame.</summary>
@@ -18,12 +18,31 @@ internal static class NativeLoopbackProbe
 
     public static int Main()
     {
-        string root = Path.Combine(Path.GetTempPath(), "filexfer-loopback-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        string root = Path.Combine(Path.GetTempPath(), "xfer-loopback-" + Guid.NewGuid().ToString("N").Substring(0, 8));
         string source = Path.Combine(root, "送る資料"), output = Path.Combine(root, "output");
         try
         {
             Directory.CreateDirectory(Path.Combine(source, "写真"));
             var random = new Random(20261017);
+            foreach (int previewWidth in new[] { 7, 32, 33 })
+            {
+                int previewHeight = 19;
+                var input = Bytes(random, previewWidth * previewHeight * 4);
+                var preview = NativeBitmap.Downscale(input, previewWidth, previewHeight, (previewWidth + 1) / 2);
+                bool exact = true;
+                for (int y = 0; y < preview.Height; y++)
+                    for (int x = 0; x < preview.Width; x++)
+                    {
+                        for (int channel = 0; channel < 3; channel++)
+                        {
+                            int at = (y * 2 * previewWidth + x * 2) * 4 + channel;
+                            int expected = (input[at] + input[at + 4] + input[at + previewWidth * 4] + input[at + previewWidth * 4 + 4]) / 4;
+                            if (preview.Pixels[(y * preview.Width + x) * 4 + channel] != expected) exact = false;
+                        }
+                        if (preview.Pixels[(y * preview.Width + x) * 4 + 3] != 255) exact = false;
+                    }
+                Check(exact, "preview box filter equals channel averages at width " + previewWidth);
+            }
             var originals = new Dictionary<string, byte[]>
             {
                 ["メモ.txt"] = Encoding.UTF8.GetBytes("光学転送のテストです。\n"),

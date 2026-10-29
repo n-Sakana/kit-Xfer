@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace FileXfer
+namespace Xfer
 {
     internal sealed class RemoteControlRegistry
     {

@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class NativeShutdown
     {

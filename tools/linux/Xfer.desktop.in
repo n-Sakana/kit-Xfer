@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=FileXfer
+Name=Xfer
 Comment=Optical file transfer
 Exec=@EXEC@
 Path=@PATH@

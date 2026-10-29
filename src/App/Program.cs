@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FileXfer
+namespace Xfer
 {
     public static class Program
     {
@@ -44,7 +44,7 @@ namespace FileXfer
 
             int runningProcessId;
             string discoveryError;
-            if (TryFindRunningFileXfer(
+            if (TryFindRunningXfer(
                 options.Port,
                 appDirectory,
                 out runningProcessId,
@@ -53,23 +53,23 @@ namespace FileXfer
                 if (discoveryError != null)
                 {
                     Console.Error.WriteLine(
-                        "FileXfer could not replace the running FileXfer: {0}",
+                        "Xfer could not replace the running Xfer: {0}",
                         discoveryError);
                     return 1;
                 }
 
                 Console.WriteLine(
-                    "Replacing the running FileXfer (pid {0}).",
+                    "Replacing the running Xfer (pid {0}).",
                     runningProcessId);
 
                 string stopError;
-                if (!TryStopRunningFileXfer(
+                if (!TryStopRunningXfer(
                     options.Port,
                     runningProcessId,
                     out stopError))
                 {
                     Console.Error.WriteLine(
-                        "FileXfer could not stop the running FileXfer (pid {0}): {1}",
+                        "Xfer could not stop the running Xfer (pid {0}): {1}",
                         runningProcessId,
                         stopError);
                     return 1;
@@ -81,7 +81,7 @@ namespace FileXfer
             {
                 StaticAssets.Initialize(
                     appDirectory,
-                    Environment.GetEnvironmentVariable("FileXfer_BUILD_ID"));
+                    Environment.GetEnvironmentVariable("Xfer_BUILD_ID"));
                 state = new AppState(options.InitialPath);
             }
             catch (ArgumentException exception)
@@ -120,13 +120,13 @@ namespace FileXfer
                 {
                     Diagnostics.Failure("server.start", "http", exception);
                     Console.Error.WriteLine(
-                        "FileXfer could not listen on localhost:{0}: {1}",
+                        "Xfer could not listen on localhost:{0}: {1}",
                         options.Port,
                         exception.Message);
                     return 1;
                 }
 
-                Console.WriteLine("FileXfer is listening at {0}", appUri);
+                Console.WriteLine("Xfer is listening at {0}", appUri);
                 Console.WriteLine(
                     "Input: {0}",
                     state.ReadFolder(options.InitialMode ?? "optical").Path);
@@ -177,7 +177,7 @@ namespace FileXfer
                     if (!options.NoBrowser)
                     {
                         Console.WriteLine(
-                            "The FileXfer window opens from FileXfer.vbs or ./FileXfer; the HTTP server will remain running.");
+                            "The Xfer window opens from Xfer.vbs or ./Xfer; the HTTP server will remain running.");
                     }
 
                     serverTask.GetAwaiter().GetResult();
@@ -195,7 +195,7 @@ namespace FileXfer
             return 0;
         }
 
-        internal static bool TryFindRunningFileXfer(
+        internal static bool TryFindRunningXfer(
             int port,
             string appDirectory,
             out int processId,
@@ -238,7 +238,7 @@ namespace FileXfer
 
                         stream.CopyTo(body);
                         var status = JsonCodec.ParseObject(body.ToArray());
-                        if (!IsFileXferStatus(status))
+                        if (!IsXferStatus(status))
                         {
                             return false;
                         }
@@ -258,7 +258,7 @@ namespace FileXfer
                         }
 
                         error = string.Format(
-                            "The running FileXfer did not report its process ID, and its host process could not be identified: {0}",
+                            "The running Xfer did not report its process ID, and its host process could not be identified: {0}",
                             legacyError);
                         return true;
                     }
@@ -312,7 +312,7 @@ namespace FileXfer
                 return false;
             }
 
-            var scriptPath = Path.GetFullPath(Path.Combine(appDirectory, "FileXfer.ps1"));
+            var scriptPath = Path.GetFullPath(Path.Combine(appDirectory, "Xfer.ps1"));
             var matches = new List<int>();
             object searcher = null;
             object results = null;
@@ -390,7 +390,7 @@ namespace FileXfer
             return false;
         }
 
-        internal static bool TryStopRunningFileXfer(
+        internal static bool TryStopRunningXfer(
             int port,
             int processId,
             out string error)
@@ -465,7 +465,7 @@ namespace FileXfer
 #endif
                 request.Method = "POST";
                 request.ContentLength = 0;
-                request.Headers["X-FileXfer-Process-Id"] = processId.ToString();
+                request.Headers["X-Xfer-Process-Id"] = processId.ToString();
                 request.AllowAutoRedirect = false;
                 request.Proxy = null;
                 request.Timeout = 1000;
@@ -513,14 +513,14 @@ namespace FileXfer
             }
         }
 
-        private static bool IsFileXferStatus(Dictionary<string, object> status)
+        private static bool IsXferStatus(Dictionary<string, object> status)
         {
             object application;
             object device;
             object platform;
             object version;
             object capabilities;
-            return status.TryGetValue("application", out application) && object.Equals(application, "FileXfer")
+            return status.TryGetValue("application", out application) && object.Equals(application, "Xfer")
                 && status.TryGetValue("device", out device) && device is string
                 && status.TryGetValue("platform", out platform) && platform is string
                 && status.TryGetValue("version", out version) && version is string

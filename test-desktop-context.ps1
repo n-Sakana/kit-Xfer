@@ -7,11 +7,11 @@ if (-not $env:SystemRoot) { $env:SystemRoot = '/Windows' }
 . (Join-Path $root 'common/install.ps1')
 $lines = @(Build-RegistryLines $true)
 $text = $lines -join "`n"
-Assert-True ($script:MenuName -eq 'FileXfer' -and $script:KeyName -eq 'FileXfer') 'Application name mismatch.'
+Assert-True ($script:MenuName -eq 'Xfer' -and $script:KeyName -eq 'Xfer') 'Application name mismatch.'
 Assert-True ($script:Contexts.Count -eq 4) 'Expected four contexts.'
 Assert-True ($script:MenuItems.Count -eq 1) 'Unexpected option count.'
 foreach ($context in $script:Contexts) {
-    $key = $context + '\FileXfer'
+    $key = $context + '\Xfer'
     Assert-True ($lines -contains ('[' + $key + ']')) ('Missing top-level app: ' + $key)
     Assert-True ($context.StartsWith('HKEY_CURRENT_USER\')) 'Only HKCU is permitted.'
     if ($context -match 'Background\\shell$') {
@@ -30,19 +30,19 @@ Assert-True ($text -notmatch 'HKLM|HKEY_LOCAL_MACHINE|runas') 'Unexpected machin
 $removeLines = @(Build-RegistryLines $false)
 Assert-True (@($removeLines | Where-Object { $_.StartsWith('[-HKEY_CURRENT_USER\') }).Count -eq 4) 'Removal misses a context.'
 foreach ($context in $script:Contexts) {
-    Assert-True ($removeLines -contains ('[-' + $context + '\FileXfer]')) 'Removal targets another application.'
+    Assert-True ($removeLines -contains ('[-' + $context + '\Xfer]')) 'Removal targets another application.'
 }
 # The kit's shared uninstaller: dot-sourcing loads its functions without touching the registry.
 $installContexts = @($script:Contexts)
 $uninstall = [IO.File]::ReadAllText((Join-Path $root 'common/uninstall.ps1'))
 . (Join-Path $root 'common/uninstall.ps1')
-Assert-True ($script:OwnKey -eq 'FileXfer') 'Uninstall must know its own key.'
+Assert-True ($script:OwnKey -eq 'Xfer') 'Uninstall must know its own key.'
 Assert-True (@($script:Contexts).Count -eq $installContexts.Count) 'Uninstall must look at the four contexts.'
 foreach ($context in $script:Contexts) {
     Assert-True ($installContexts -contains ('HKEY_CURRENT_USER\' + $context.Path)) ('Uninstall looks outside the install contexts: ' + $context.Path)
 }
-Assert-RegistrationPath 'Software\Classes\Directory\shell\FileXfer'
-foreach ($outside in @('Software\Microsoft\Windows\CurrentVersion\Run\FileXfer', 'Software\Classes\Directory\shell\FileXfer\command', 'Software\Classes\Directory\shell')) {
+Assert-RegistrationPath 'Software\Classes\Directory\shell\Xfer'
+foreach ($outside in @('Software\Microsoft\Windows\CurrentVersion\Run\Xfer', 'Software\Classes\Directory\shell\Xfer\command', 'Software\Classes\Directory\shell')) {
     $refused = $false
     try { Assert-RegistrationPath $outside } catch { $refused = $true }
     Assert-True $refused ('Uninstall must refuse ' + $outside)
@@ -62,4 +62,4 @@ foreach ($path in @((Get-ChildItem -LiteralPath $root -Filter '*.ps1').FullName)
     [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
     Assert-True (@($errors).Count -eq 0) ('PowerShell parse failed: ' + $path + ': ' + $errors)
 }
-Write-Output 'FileXfer_DESKTOP_PLAN_OK (no Windows registry or Explorer execution)'
+Write-Output 'Xfer_DESKTOP_PLAN_OK (no Windows registry or Explorer execution)'

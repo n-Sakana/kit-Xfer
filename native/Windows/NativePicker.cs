@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>The Windows common item dialog (IFileOpenDialog) through raw COM vtables, for Native AOT.
     /// Same contract as src/Common/NativePicker.cs, which the managed Linux build keeps using.</summary>
@@ -42,7 +42,7 @@ namespace FileXfer
             {
                 try { completion.SetResult(operation()); }
                 catch (Exception error) { completion.SetException(error); }
-            }) { IsBackground = true, Name = "FileXfer picker" };
+            }) { IsBackground = true, Name = "Xfer picker" };
             thread.SetApartmentState(ApartmentState.STA);
             thread.Start();
             return completion.Task;

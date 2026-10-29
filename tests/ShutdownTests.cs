@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class ShutdownTests
     {
@@ -16,7 +16,7 @@ namespace FileXfer
             string home = Path.GetFullPath(args[0]), work = Path.GetFullPath(args[1]);
             Directory.CreateDirectory(work);
             string logs = Path.Combine(work, "logs");
-            Environment.SetEnvironmentVariable("FileXfer_LOG_DIR", logs);
+            Environment.SetEnvironmentVariable("Xfer_LOG_DIR", logs);
             var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
             int port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop();
             string reply = NativeApp.Instance.Call(Encoding.UTF8.GetString(JsonCodec.Serialize(new {

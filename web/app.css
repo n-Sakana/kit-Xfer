@@ -1,6 +1,6 @@
-@font-face { font-family: "Inter"; src: url("/fonts/Inter-Regular.ttf?v=__FileXfer_BUILD_ID__") format("truetype"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Inter"; src: url("/fonts/Inter-Medium.ttf?v=__FileXfer_BUILD_ID__") format("truetype"); font-weight: 500; font-display: swap; }
-@font-face { font-family: "Inter"; src: url("/fonts/Inter-SemiBold.ttf?v=__FileXfer_BUILD_ID__") format("truetype"); font-weight: 600 900; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-Regular.ttf?v=__Xfer_BUILD_ID__") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-Medium.ttf?v=__Xfer_BUILD_ID__") format("truetype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-SemiBold.ttf?v=__Xfer_BUILD_ID__") format("truetype"); font-weight: 600 900; font-display: swap; }
 
 /* The same tokens as the desktop screens (ui/app.css). Dark unless the phone or the toggle asks for light. */
 :root {

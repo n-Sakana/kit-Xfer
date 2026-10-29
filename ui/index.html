@@ -2,7 +2,7 @@
 <html lang="ja" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<title>FileXfer</title>
+<title>Xfer</title>
 <link rel="icon" href="icon.png">
 <link rel="stylesheet" href="app.css">
 <script src="app.js" defer></script>
@@ -10,7 +10,7 @@
 <body>
 <div class="app" id="app">
   <aside class="sidebar" id="sidebar">
-    <div class="brand">FileXfer</div>
+    <div class="brand">Xfer</div>
     <nav class="nav" aria-label="画面">
       <button class="nav-row is-active" type="button" id="navSend" data-view="send">送る</button>
       <button class="nav-row" type="button" id="navReceive" data-view="receive">受け取る</button>
@@ -46,14 +46,14 @@
           <h2 class="label">送り方</h2>
           <div class="field"><span class="field-name">表示</span>
             <span class="seg" id="layoutGroup"><button type="button" data-layout="fx2">Tile</button><button type="button" data-layout="qr">QR</button></span></div>
-          <!-- The chosen method's own settings, in a box of fixed height: switching the method changes what is in the
-               box and nothing outside it. Both put the frame rate on the second row and error correction on the fourth. -->
+          <!-- Five settings per method, in a fixed-height box. Frame rate is on the second row. -->
           <div class="methods">
             <div class="method" data-for="fx2">
               <div class="field"><span class="field-name">セルの大きさ</span>
                 <span class="stepper"><button type="button" class="step" id="cellSmaller" aria-label="小さくする"></button><span class="step-value" id="cellValue"></span><button type="button" class="step plus" id="cellLarger" aria-label="大きくする"></button></span></div>
               <div class="field"><span class="field-name">1 秒の枚数</span>
                 <button class="select" type="button" id="tileRate" data-menu="tileRate"><span class="select-value"></span><span class="chevron"></span></button></div>
+              <div class="field"><span class="field-name">色を重ねる</span><button type="button" class="switch" role="switch" id="tileColor" aria-label="色を重ねる" aria-checked="false"></button></div>
               <div class="field"><span class="field-name">中央の粗い区画</span>
                 <span class="seg" id="coarseGroup"><button type="button" data-coarse="0">なし</button><button type="button" data-coarse="2">2 倍</button><button type="button" data-coarse="3">3 倍</button></span></div>
               <div class="field"><span class="field-name">誤り訂正</span>
@@ -151,7 +151,7 @@
 </div>
 
 <!-- QR を出している間 -->
-<div class="present" id="present" hidden>
+<div class="present" id="present" tabindex="-1" hidden>
   <div class="present-qr" id="presentFrame"><img id="presentImage" alt=""></div>
   <div class="present-bar" id="presentBar">
     <span class="stepper"><button type="button" class="step" id="presentSmaller" aria-label="小さくする"></button><span class="step-value" id="presentSize"></span><button type="button" class="step plus" id="presentLarger" aria-label="大きくする"></button></span>

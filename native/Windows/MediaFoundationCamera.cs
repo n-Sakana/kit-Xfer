@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>Video capture through Media Foundation's source reader (raw COM vtables, Native AOT safe).
     /// The reader converts the camera's format to RGB32; frames are delivered as opaque BGRA.</summary>
@@ -127,7 +127,7 @@ namespace FileXfer
         public void Start(Action<byte[], int, int> frame)
         {
             _running = true;
-            _thread = new Thread(() => Capture(frame)) { IsBackground = true, Name = "FileXfer camera" };
+            _thread = new Thread(() => Capture(frame)) { IsBackground = true, Name = "Xfer camera" };
             _thread.Start();
         }
 

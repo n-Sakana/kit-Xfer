@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 
-namespace FileXfer
+namespace Xfer
 {
     // Only call with fixed event/field names and deliberately selected metadata. Never pass
     // request bodies, URLs, paths, exception messages, QR bytes or object snapshots here.
@@ -59,11 +59,11 @@ namespace FileXfer
         public static long Stamp() { return Stopwatch.GetTimestamp(); }
         internal static string LogDirectory()
         {
-            var directory = Environment.GetEnvironmentVariable("FileXfer_LOG_DIR");
+            var directory = Environment.GetEnvironmentVariable("Xfer_LOG_DIR");
             if (!string.IsNullOrWhiteSpace(directory)) return directory;
             var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
             if (string.IsNullOrWhiteSpace(local)) throw new IOException("No local diagnostic directory");
-            return Path.Combine(local, "FileXfer", "logs");
+            return Path.Combine(local, "Xfer", "logs");
         }
         public static double Milliseconds(long stamp) { return (Stopwatch.GetTimestamp() - stamp) * 1000.0 / Stopwatch.Frequency; }
         public static void Failure(string stage, string correlation, Exception error,
@@ -82,7 +82,7 @@ namespace FileXfer
                 var frames = new StackTrace(cause, true).GetFrames();
                 if (frames != null) foreach (var frame in frames) {
                     var method = frame.GetMethod();
-                    if (method == null || method.DeclaringType == null || method.DeclaringType.Namespace != "FileXfer") continue;
+                    if (method == null || method.DeclaringType == null || method.DeclaringType.Namespace != "Xfer") continue;
                     return new { Type = cause.GetType().Name, Code = cause.HResult,
                         Site = method.DeclaringType.Name + "." + method.Name,
                         Line = frame.GetFileLineNumber(), Il = frame.GetILOffset() };

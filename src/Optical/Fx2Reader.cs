@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>Reads FX2 patches from a camera picture (8-bit gray): local threshold, marker cores (isolated
     /// compact dark blobs), each core's lattice axes from its neighbours, the ID ring, the screen's orientation by
@@ -28,7 +28,7 @@ namespace FileXfer
         {
             public int Tier, Column, Row, Corrected, Guessed;
             public double Sharpening;
-            public bool Decoded;
+            public bool Decoded, LumaDecoded, Color, ColorDecoded;
             public string Failure;
             public double[] Corners;
             public uint Sequence;
@@ -41,11 +41,12 @@ namespace FileXfer
             public readonly List<Patch> Patches = new List<Patch>();
             public int Candidates, Transform = -1, Corrected;
             /// <summary>Patches read without the blur correction: most of them when the picture is sharp.</summary>
-            public int Plain;
+            public int Plain, LumaDecoded, ColorSeen, ColorDecoded;
             /// <summary>Every marker core candidate (for tools).</summary>
             public List<Marker> CandidateList;
             /// <summary>Milliseconds: total, threshold, blobs, IDs, patches.</summary>
             public double Ms, ThresholdMs, BlobMs, IdMs, PatchMs;
+            public bool Tracked;
         }
 
         private int[] _blockSum = new int[0], _blockMin = new int[0], _blockMax = new int[0], _threshold = new int[0];
@@ -53,20 +54,62 @@ namespace FileXfer
         private int[] _rowFirst = new int[0], _area = new int[0], _minX = new int[0], _maxX = new int[0], _minY = new int[0], _maxY = new int[0], _blob = new int[0];
         private readonly byte[] _cells = new byte[Fx2.DataCells.Length];
         private readonly double[] _samples = new double[Fx2.DataCells.Length], _grid = new double[Fx2.Pitch * Fx2.Pitch];
+        private readonly double[] _chromaR = new double[Fx2.ColorCells.Length], _chromaB = new double[Fx2.ColorCells.Length];
+        private readonly byte[] _colorBits = new byte[Fx2.ColorCells.Length * 2];
+        private Result _tracked;
+        private int _trackedWidth, _trackedHeight, _trackedAge;
 
-        public Result Read(byte[] gray, int width, int height)
+        public Result Read(byte[] gray, int width, int height, byte[] bgra = null)
         {
             var stamp = Diagnostics.Stamp();
             var result = new Result();
+            // The marker grid stays still while the data changes. Validate its IDs in this picture before
+            // reusing geometry; CRC-checked patches decide whether it is still accurate enough. Reacquire
+            // periodically, or immediately after movement, a layout change, or a loss of readable patches.
+            if (_tracked != null && _trackedWidth == width && _trackedHeight == height && _trackedAge++ < 15)
+            {
+                var transforms = new int[8];
+                foreach (var m in _tracked.Markers)
+                {
+                    double dark, light;
+                    if (ReadRing(gray, width, height, m.X, m.Y, m.Ux, m.Uy, m.Vx, m.Vy, transforms, out dark, out light) > 1) continue;
+                    int value = transforms[_tracked.Transform];
+                    int id = m.Column | m.Row << 5 | m.Tier << 9 | m.Level << 10;
+                    if (value < 0 || value >> 12 > 1 || (value & 4095) != id) continue;
+                    m.Dark = dark; m.Light = light;
+                    result.Markers.Add(m);
+                }
+                // Full discovery also keeps plausible IDs in the changing data. Only matching IDs are
+                // needed here; the successfully decoded patch count below is the measure of usable geometry.
+                if (result.Markers.Count >= 4)
+                {
+                    result.Transform = _tracked.Transform;
+                    result.IdMs = Diagnostics.Milliseconds(stamp);
+                    Assemble(gray, width, height, bgra, result);
+                    if (result.LumaDecoded >= Math.Max(1, _tracked.LumaDecoded / 2))
+                    {
+                        result.Tracked = true;
+                        result.Ms = Diagnostics.Milliseconds(stamp);
+                        result.PatchMs = result.Ms - result.IdMs;
+                        return result;
+                    }
+                }
+                result = new Result();
+            }
+            _tracked = null;
             Threshold(gray, width, height);
             result.ThresholdMs = Diagnostics.Milliseconds(stamp);
             var candidates = Candidates(gray, width, height, result);
             result.BlobMs = Diagnostics.Milliseconds(stamp) - result.ThresholdMs;
             Orient(gray, width, height, candidates, result);
             result.IdMs = Diagnostics.Milliseconds(stamp) - result.ThresholdMs - result.BlobMs;
-            Assemble(gray, width, height, result);
+            Assemble(gray, width, height, bgra, result);
             result.Ms = Diagnostics.Milliseconds(stamp);
             result.PatchMs = result.Ms - result.ThresholdMs - result.BlobMs - result.IdMs;
+            if (result.LumaDecoded >= 4)
+            {
+                _tracked = result; _trackedWidth = width; _trackedHeight = height; _trackedAge = 0;
+            }
             return result;
         }
 
@@ -379,7 +422,7 @@ namespace FileXfer
 
         // ---------------------------------------------------------------- patches
 
-        private void Assemble(byte[] gray, int width, int height, Result result)
+        private void Assemble(byte[] gray, int width, int height, byte[] bgra, Result result)
         {
             int t = result.Transform;
             if (t < 0) return;
@@ -417,13 +460,15 @@ namespace FileXfer
                 var corners = new[] { m, tr, bl, br };
                 byte[] frame;
                 int corrected;
-                if (ReadPatch(gray, width, height, c, corners, m.Level, out frame, out corrected, patch))
+                if (ReadPatch(gray, width, height, bgra, c, corners, m.Level, out frame, out corrected, patch))
                 {
                     patch.Decoded = true; patch.Corrected = corrected; result.Corrected += corrected;
-                    if (patch.Sharpening == 0) result.Plain++;
                     patch.Sequence = frame.Length >= 8 ? (uint)(frame[4] | frame[5] << 8 | frame[6] << 16 | frame[7] << 24) : 0;
                     result.Frames.Add(frame);
                 }
+                if (patch.LumaDecoded) { result.LumaDecoded++; if (patch.Sharpening == 0) result.Plain++; }
+                if (patch.Color) result.ColorSeen++;
+                if (patch.ColorDecoded) result.ColorDecoded++;
             }
         }
 
@@ -446,7 +491,7 @@ namespace FileXfer
             return best;
         }
 
-        private bool ReadPatch(byte[] gray, int width, int height, double[] c, Marker[] corners, int level, out byte[] frame, out int corrected, Patch patch)
+        private bool ReadPatch(byte[] gray, int width, int height, byte[] bgra, double[] c, Marker[] corners, int level, out byte[] frame, out int corrected, Patch patch)
         {
             frame = null; corrected = 0;
             // Projective map of the unit square onto TL, TR, BR, BL (Heckbert).
@@ -510,10 +555,53 @@ namespace FileXfer
                 }
                 double threshold = TwoMeans(_samples, order.Length);
                 for (int i = 0; i < order.Length; i++) _cells[i] = _samples[i] < threshold ? (byte)1 : (byte)0;
-                if (code.TryDecode(_cells, out frame, out corrected)) { patch.Sharpening = k; return true; }
+                if (code.TryDecode(_cells, out frame, out corrected)) { patch.Sharpening = k; patch.LumaDecoded = true; break; }
             }
-            patch.Failure = "rs";
-            return false;
+            if (!patch.LumaDecoded) { patch.Failure = "rs"; return false; }
+            if (frame[0] != Fx2.ColorTag || (frame[1] != 0x0c && frame[1] != 0x0d)) return true;
+            patch.Color = true;
+            if (bgra == null) { patch.Failure = "color-missing"; return false; }
+            // Average chroma around each 2x2-cell centre. R-G and B-G remove the luminance data;
+            // local two-means thresholds absorb white balance and illumination shifts.
+            for (int i = 0; i < Fx2.ColorCells.Length; i++)
+            {
+                int at = Fx2.ColorCells[i];
+                double red = 0, blue = 0;
+                for (int dy = -1; dy <= 1; dy += 2)
+                    for (int dx = -1; dx <= 1; dx += 2)
+                    {
+                        double s = (at % M + 0.5 + dx * 0.3) * step, t = (at / M + 0.5 + dy * 0.3) * step;
+                        double w = g * s + h * t + 1;
+                        double px = (a * s + b * t + x0) / w, py = (d * s + e * t + y0) / w;
+                        red += Chroma(bgra, width, height, px, py, 2);
+                        blue += Chroma(bgra, width, height, px, py, 0);
+                    }
+                _chromaR[i] = red / 4; _chromaB[i] = blue / 4;
+            }
+            double redThreshold = TwoMeans(_chromaR, _chromaR.Length), blueThreshold = TwoMeans(_chromaB, _chromaB.Length);
+            for (int i = 0; i < Fx2.ColorCells.Length; i++)
+            {
+                _colorBits[i * 2] = _chromaR[i] > redThreshold ? (byte)1 : (byte)0;
+                _colorBits[i * 2 + 1] = _chromaB[i] > blueThreshold ? (byte)1 : (byte)0;
+            }
+            byte[] tail; int colorCorrected;
+            if (!Fx2Code.ForColor(level).TryDecode(_colorBits, out tail, out colorCorrected)) { patch.Failure = "color-rs"; return false; }
+            var combined = new byte[frame.Length + tail.Length - 4];
+            Buffer.BlockCopy(frame, 0, combined, 0, frame.Length); combined[0] = 0xd1;
+            Buffer.BlockCopy(tail, 4, combined, frame.Length, tail.Length - 4);
+            uint checksum = (uint)tail[0] << 24 | (uint)tail[1] << 16 | (uint)tail[2] << 8 | tail[3];
+            if (Fx2.Crc32(combined, 0, combined.Length) != checksum) { patch.Failure = "color-mixed"; return false; }
+            frame = combined; corrected += colorCorrected; patch.ColorDecoded = true;
+            return true;
+        }
+
+        private static double Chroma(byte[] bgra, int width, int height, double x, double y, int channel)
+        {
+            x = Math.Max(0, Math.Min(width - 1.001, x)); y = Math.Max(0, Math.Min(height - 1.001, y));
+            int ix = (int)x, iy = (int)y, i = (iy * width + ix) * 4, below = i + width * 4;
+            double fx = x - ix, fy = y - iy;
+            return ((bgra[i + channel] - bgra[i + 1]) * (1 - fx) + (bgra[i + 4 + channel] - bgra[i + 5]) * fx) * (1 - fy)
+                + ((bgra[below + channel] - bgra[below + 1]) * (1 - fx) + (bgra[below + 4 + channel] - bgra[below + 5]) * fx) * fy;
         }
 
         private static readonly double[] Sharpening = { 0, 0.6, 1.2 };

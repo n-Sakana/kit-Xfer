@@ -48,8 +48,8 @@
     }
   };
 
-  var diag = window.FileXferDiagnostics;
-  var opticalCore = window.FileXferOptical;
+  var diag = window.XferDiagnostics;
+  var opticalCore = window.XferOptical;
   document.addEventListener("click", function (event) {
     var control = event.target.closest && event.target.closest("button, [role=switch], .file-row");
     if (!control) return;
@@ -390,7 +390,7 @@
   function loadThemePreference() {
     var preference = null;
     try {
-      var stored = window.localStorage.getItem("ferry-theme");
+      var stored = window.localStorage.getItem("xfer-theme");
       if (stored === "light" || stored === "dark") {
         preference = stored;
       }
@@ -425,7 +425,7 @@
     }
     if (persist) {
       try {
-        window.localStorage.setItem("ferry-theme", preference);
+        window.localStorage.setItem("xfer-theme", preference);
       } catch (_) {
         // Keep the selected theme for this session when storage is unavailable.
       }
@@ -482,7 +482,7 @@
       window.history.replaceState(null, "", "#" + page);
     }
 
-    document.title = "FileXfer";
+    document.title = "Xfer";
     if (moveFocus) {
       document.getElementById("workspace").focus({ preventScroll: true });
       document.getElementById("workspace").scrollTo({ top: 0, behavior: "smooth" });
@@ -926,11 +926,11 @@
 
   function pumpQrFrames(renderer) {
     while (isCurrentQrRenderer(renderer) && renderer.pendingBatches < 2 && renderer.queue.length < 24) {
-      var batch = { sequence: renderer.nextSequence >>> 0, entries: [], failures: 0, retryTimer: null, controller: null };
+      var batch = { sequence: renderer.nextSequence, entries: [], failures: 0, retryTimer: null, controller: null };
       for (var index = 0; index < Math.min(8, 24 - renderer.queue.length); index++) {
-        batch.entries.push({ sequence: (batch.sequence + index) >>> 0, image: null });
+        batch.entries.push({ sequence: batch.sequence + index, image: null });
       }
-      renderer.nextSequence = (batch.sequence + batch.entries.length) >>> 0;
+      renderer.nextSequence = batch.sequence + batch.entries.length;
       Array.prototype.push.apply(renderer.queue, batch.entries);
       renderer.pendingBatches++;
       renderer.batches.add(batch);
@@ -1293,7 +1293,7 @@
     diag.event("worker.start", diag.id(state.cameraReceiverId), { workers: workerCount });
     for (var index = 0; index < workerCount; index++) {
       (function () {
-        var worker = new Worker("/qr-worker.js?v=__FileXfer_BUILD_ID__");
+        var worker = new Worker("/qr-worker.js?v=__Xfer_BUILD_ID__");
         var slot = { worker: worker, busy: false, failed: false, ready: false, frameId: -1, initTimer: null, region: null };
         var fail = function (reason, detail) {
           diag.event("worker.failed", diag.id(state.cameraReceiverId), { initTimeout: !reason, wasReady: slot.ready,
@@ -1633,7 +1633,7 @@
   }
 
   function updateTransferFormats() {
-    // FileXfer sends the selected original files.
+    // Xfer sends the selected original files.
 
   }
 
@@ -1906,7 +1906,7 @@
     var menu = document.getElementById("remoteDeviceMenu");
     menu.replaceChildren();
     if (devices.length === 0) {
-      appendMessage(menu, "FileXfer が動いている PC は見つかりません", "menu-message");
+      appendMessage(menu, "Xfer が動いている PC は見つかりません", "menu-message");
       return;
     }
     devices.forEach(function (device) {
@@ -1942,7 +1942,7 @@
     }
     window.addEventListener("load", function () {
       navigator.serviceWorker.register(
-        "/service-worker.js?v=__FileXfer_BUILD_ID__",
+        "/service-worker.js?v=__Xfer_BUILD_ID__",
         { scope: "/", updateViaCache: "none" }).catch(function () {});
     });
   }
@@ -1973,7 +1973,7 @@
       var body;
       try { body = await response.json(); } catch (_) { body = null; }
       if (!response.ok || body === null) {
-        var error = new Error(body && body.error ? body.error : "FileXfer につながりませんでした。");
+        var error = new Error(body && body.error ? body.error : "Xfer につながりませんでした。");
         error.status = response.ok ? 502 : response.status;
         throw error;
       }
@@ -2009,7 +2009,7 @@
   }
 
   function errorMessage(error) {
-    return error && error.message ? error.message : "FileXfer の処理中にエラーが起きました。";
+    return error && error.message ? error.message : "Xfer の処理中にエラーが起きました。";
   }
 
   function folderLeaf(path) {

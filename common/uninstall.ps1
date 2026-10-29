@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 
 # ---- App section ----
 # BeforeRemove / AfterRemove run only when the chosen registration is this app's own verb.
-$script:OwnKey = 'FileXfer'
+$script:OwnKey = 'Xfer'
 $script:BeforeRemove = $null
 $script:AfterRemove = $null
 # ---- End of app section ----

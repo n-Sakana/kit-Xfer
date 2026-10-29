@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f1f2f3" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1c1d1f" media="(prefers-color-scheme: dark)">
-  <title>FileXfer</title>
+  <title>Xfer</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="manifest" href="/manifest.webmanifest?v=__FileXfer_BUILD_ID__">
-  <link rel="stylesheet" href="/app.css?v=__FileXfer_BUILD_ID__">
-  <script src="/optical-core.js?v=__FileXfer_BUILD_ID__" defer></script>
-  <script src="/diagnostics.js?v=__FileXfer_BUILD_ID__" defer></script>
-  <script src="/app.js?v=__FileXfer_BUILD_ID__" defer></script>
+  <link rel="manifest" href="/manifest.webmanifest?v=__Xfer_BUILD_ID__">
+  <link rel="stylesheet" href="/app.css?v=__Xfer_BUILD_ID__">
+  <script src="/optical-core.js?v=__Xfer_BUILD_ID__" defer></script>
+  <script src="/diagnostics.js?v=__Xfer_BUILD_ID__" defer></script>
+  <script src="/app.js?v=__Xfer_BUILD_ID__" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#workspace">本文へ移動</a>
 
   <div class="app" id="appShell" data-role="loading" data-view="send">
     <header class="top">
-      <span class="brand">FileXfer</span>
+      <span class="brand">Xfer</span>
       <div class="remote-picker">
         <button class="pc-button" id="remoteDeviceButton" type="button" aria-label="操作する PC" aria-haspopup="listbox" aria-controls="remoteDeviceMenu" aria-expanded="false">
           <span class="dot" aria-hidden="true"></span>
@@ -36,7 +36,7 @@
     </header>
 
     <main class="workspace" id="workspace" tabindex="-1">
-      <section class="page" data-page-panel="optical" aria-label="FileXfer">
+      <section class="page" data-page-panel="optical" aria-label="Xfer">
         <div class="seg direction" id="opticalDirection" aria-label="送るか受け取るか">
           <button class="is-active" type="button" data-view="send" aria-pressed="true">送る</button>
           <button type="button" data-view="receive" aria-pressed="false">受け取る</button>
@@ -203,6 +203,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <noscript>FileXfer を使うには JavaScript を有効にしてください。</noscript>
+  <noscript>Xfer を使うには JavaScript を有効にしてください。</noscript>
 </body>
 </html>

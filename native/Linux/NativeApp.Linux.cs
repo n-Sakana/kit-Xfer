@@ -3,16 +3,16 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 
-namespace FileXfer
+namespace Xfer
 {
     internal sealed partial class NativeApp
     {
-        /// <summary>V4L2 cameras: the capture node (index 0) of each device. FileXfer_CAMERA_DEVICE=/dev/videoN names
+        /// <summary>V4L2 cameras: the capture node (index 0) of each device. Xfer_CAMERA_DEVICE=/dev/videoN names
         /// one explicitly.</summary>
         private static List<CameraInfo> Cameras()
         {
             var cameras = new List<CameraInfo>();
-            string chosen = Environment.GetEnvironmentVariable("FileXfer_CAMERA_DEVICE");
+            string chosen = Environment.GetEnvironmentVariable("Xfer_CAMERA_DEVICE");
             if (!string.IsNullOrWhiteSpace(chosen))
             {
                 cameras.Add(new CameraInfo(chosen.Trim(), FfmpegCamera.DeviceName(chosen.Trim())));

@@ -6,7 +6,7 @@ using System.Threading;
 using ZXing;
 using ZXing.Common;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>A camera that delivers opaque BGRA frames on its own thread until disposed.</summary>
     internal interface ICameraSource : IDisposable
@@ -38,7 +38,7 @@ namespace FileXfer
         public string Name { get; private set; }
     }
 
-    /// <summary>Reads FileXfer frames from a camera: keeps the newest frame for the preview, and on worker threads
+    /// <summary>Reads Xfer frames from a camera: keeps the newest frame for the preview, and on worker threads
     /// reads every FX2 patch in the picture, or when no FX2 markers are in view, a QR code around the last QR
     /// position (with a periodic full search); every frame read goes to the fountain decoder. The receiver needs no
     /// setting for which the sender shows.</summary>
@@ -59,6 +59,7 @@ namespace FileXfer
         private string _error;
         private bool _stopped, _complete;
         private long _captured, _decoded, _recognized, _patches;
+        private long _patchAttempts, _lumaDecoded, _colorSeen, _colorDecoded;
         private int _markers, _patchesSeen;
         private string _layout = "";
         private double _lastRecognizedMs = -1, _startedMs;
@@ -89,7 +90,7 @@ namespace FileXfer
             _startedMs = _clock.Elapsed.TotalMilliseconds;
             for (int i = 0; i < _workers; i++)
             {
-                var thread = new Thread(Decode) { IsBackground = true, Name = "FileXfer QR decoder " + (i + 1) };
+                var thread = new Thread(Decode) { IsBackground = true, Name = "Xfer QR decoder " + (i + 1) };
                 _threads.Add(thread); thread.Start();
             }
             try { _camera.Start(OnFrame); }
@@ -137,7 +138,7 @@ namespace FileXfer
                 }
                 if (full.Length < width * height) full = new byte[width * height];
                 for (int i = 0, src = 0; i < width * height; i++, src += 4) full[i] = (byte)((frame[src] * 29 + frame[src + 1] * 150 + frame[src + 2] * 77) >> 8);
-                if (ReadFx2(fx2, full, width, height)) continue;
+                if (ReadFx2(fx2, full, width, height, frame)) continue;
                 // Search near the last QR; every sixth frame (or after misses) the whole image, like the browser reader.
                 var region = Region(width, height, tracking, number, _clock.Elapsed.TotalMilliseconds);
                 int size = region.Width * region.Height;
@@ -224,10 +225,10 @@ namespace FileXfer
 
         /// <summary>Reads the FX2 patches of one picture; false when no FX2 code is in view (the QR reader takes the
         /// picture then).</summary>
-        private bool ReadFx2(Fx2Reader fx2, byte[] gray, int width, int height)
+        private bool ReadFx2(Fx2Reader fx2, byte[] gray, int width, int height, byte[] bgra)
         {
             Fx2Reader.Result read;
-            try { read = fx2.Read(gray, width, height); }
+            try { read = fx2.Read(gray, width, height, bgra); }
             catch (Exception error)
             {
                 Diagnostics.Sample("camera.decode_exception", "native", 0, new { Type = error.GetType().Name, Code = error.HResult, Site = "CameraReceiver.ReadFx2" });
@@ -237,10 +238,12 @@ namespace FileXfer
             // (two patches' corners), even if no patch reads (focus, distance). Readable marker IDs alone are not
             // enough: a QR code's finder and alignment patterns look like markers.
             if (read.Frames.Count == 0 && read.Patches.Count < 2) return false;
-            // Sharp: at least three patches read, eight in ten of them without the blur correction.
-            Focus(read.Frames.Count, read.Frames.Count >= 3 && read.Plain * 10 >= read.Frames.Count * 8);
+            // A majority of cleanly sampled patches is enough to hold useful focus. Requiring 80% let
+            // autofocus keep hunting at L even while most patches were CRC-valid after mild sharpening.
+            Focus(read.LumaDecoded, read.LumaDecoded >= 3 && read.Plain * 10 >= read.LumaDecoded * 6);
             Diagnostics.Sample("camera.fx2_read", "native", read.Ms, new { Markers = read.Markers.Count, Patches = read.Patches.Count, Decoded = read.Frames.Count,
-                Corrected = read.Corrected, Candidates = read.Candidates, ThresholdMs = read.ThresholdMs, BlobMs = read.BlobMs, IdMs = read.IdMs, PatchMs = read.PatchMs });
+                LumaDecoded = read.LumaDecoded, Plain = read.Plain, ColorSeen = read.ColorSeen, ColorDecoded = read.ColorDecoded,
+                Corrected = read.Corrected, Candidates = read.Candidates, Tracked = read.Tracked, ThresholdMs = read.ThresholdMs, BlobMs = read.BlobMs, IdMs = read.IdMs, PatchMs = read.PatchMs });
             OpticalReceiveResult progress = null;
             string failure = null;
             int recognized = 0;
@@ -258,6 +261,8 @@ namespace FileXfer
                 _decoded++;
                 _lastDecodeMs = _clock.Elapsed.TotalMilliseconds;
                 _layout = "fx2"; _markers = read.Markers.Count; _patchesSeen = read.Patches.Count; _patches += recognized;
+                _patchAttempts += read.Patches.Count; _lumaDecoded += read.LumaDecoded;
+                _colorSeen += read.ColorSeen; _colorDecoded += read.ColorDecoded;
                 if (failure != null) { _error = failure; Monitor.PulseAll(_gate); return true; }
                 if (progress != null)
                 {
@@ -302,6 +307,7 @@ namespace FileXfer
                 Diagnostics.Sample("camera.status", "native", 0, new { Captured = _captured, Decoded = _decoded,
                     Recognized = _recognized, Running = _camera.Running, Failed = _error != null || _camera.Error != null,
                     Width = _camera.Width, Height = _camera.Height, Fps = _camera.FramesPerSecond,
+                    PatchAttempts = _patchAttempts, LumaDecoded = _lumaDecoded, ColorSeen = _colorSeen, ColorDecoded = _colorDecoded,
                     CaptureAgeMs = now - (_lastCaptureMs >= 0 ? _lastCaptureMs : _startedMs),
                     DecodeAgeMs = now - (_lastDecodeMs >= 0 ? _lastDecodeMs : _startedMs),
                     ReadAgeMs = now - (_lastRecognizedMs >= 0 ? _lastRecognizedMs : _startedMs) });
@@ -322,8 +328,9 @@ namespace FileXfer
                     Markers = _markers,
                     Patches = _patches,
                     PatchesSeen = _patchesSeen,
+                    PatchAttempts = _patchAttempts, LumaDecoded = _lumaDecoded, ColorSeen = _colorSeen, ColorDecoded = _colorDecoded,
                     PreviewSequence = _previewSequence,
-                    // Milliseconds since a FileXfer QR was last read (since start when none was read yet).
+                    // Milliseconds since a Xfer QR was last read (since start when none was read yet).
                     QuietMs = (long)(now - (_lastRecognizedMs >= 0 ? _lastRecognizedMs : _startedMs)),
                     Result = _result
                 };

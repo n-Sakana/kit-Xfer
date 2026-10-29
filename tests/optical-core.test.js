@@ -46,9 +46,9 @@ test("max QR length and max container size boundaries", () => {
   assert.equal(core.parseFrame(frame(0, 1, 2934)), null);
   assert.equal(core.parseFrame(frame(0, 1, 2933, 65 * 1024 * 1024 + 64 * 1024 + 1)), null);
 });
-test("packed bitmap bit order, alpha and sequence wrap", () => {
+test("packed bitmap bit order, alpha and 64-bit request sequence", () => {
   const frames = core.unpackFrames(packed(29, 0xffffffff), 29, 0xffffffff, 2);
-  assert.equal(frames.length, 2); assert.equal(frames[1].sequence, 0);
+  assert.equal(frames.length, 2); assert.equal(frames[1].sequence, 4294967296);
   assert.deepEqual(Array.from(frames[0].pixels.slice(0, 8)), [0,0,0,255,255,255,255,255]);
   assert.equal(frames[0].pixels[7 * 4], 0);
   assert.ok(frames[1].pixels.every(v => v === 255));
@@ -142,4 +142,21 @@ test("dedup history stays bounded after long transfer",async()=>{
   const q=queue();
   for(let i=0;i<2304;i+=8){for(let j=0;j<8;j++)q.push(frame(i+j));await q.flush();}
   assert.equal(q.history.length,2048);assert.equal(q.keys.size,2048);q.stop();
+});
+
+test("streaming frame keeps 64-bit chunk identity and rejects malformed lengths", () => {
+  const bytes = new Uint8Array(245), view = new DataView(bytes.buffer);
+  bytes[0] = 0xd1; bytes[1] = 0x0d;
+  view.setUint32(4, 17, true);
+  // 8 TiB, last chunk: far past the old total/block limits, exact as a JS number.
+  view.setUint32(20, 2048, true);
+  view.setUint32(8, 134217727, true);
+  view.setUint16(44, 197, true);
+  const frame = core.parseFrame(bytes);
+  assert.ok(frame); assert.ok(frame.key.includes(":134217727:17"));
+  const next = bytes.slice(); new DataView(next.buffer).setUint32(8, 134217726, true);
+  assert.notEqual(core.parseFrame(next).key, frame.key);
+  bytes[46] = 1; assert.equal(core.parseFrame(bytes), null); bytes[46] = 0;
+  view.setUint32(8, 134217728, true); assert.equal(core.parseFrame(bytes), null);
+  view.setUint32(8, 0, true); view.setUint16(44, 198, true); assert.equal(core.parseFrame(bytes), null);
 });

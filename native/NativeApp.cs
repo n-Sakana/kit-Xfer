@@ -9,9 +9,9 @@ using System.Threading.Tasks;
 using ZXing;
 using ZXing.QrCode.Internal;
 
-namespace FileXfer
+namespace Xfer
 {
-    /// <summary>FileXfer's native component behind the MiniUI page (uiHost.call and app: images). One JSON request,
+    /// <summary>Xfer's native component behind the MiniUI page (uiHost.call and app: images). One JSON request,
     /// one JSON reply; work that takes time returns a job the page polls. Shared by the Windows DLL and the Linux host.</summary>
     internal sealed partial class NativeApp : IDisposable
     {
@@ -42,6 +42,7 @@ namespace FileXfer
         private string _tailnet = "";
         private AutoSendOptions _autoSend;
         private AutoReceiveOptions _autoReceive;
+        public bool PresentationFullscreen { get; private set; }
 
         public string Call(string input)
         {
@@ -68,7 +69,7 @@ namespace FileXfer
                 return new { Ok = true };
             }
             if (op == "init") return Init(r);
-            if (!_initialized) throw new InvalidOperationException("FileXfer is not initialised.");
+            if (!_initialized) throw new InvalidOperationException("Xfer is not initialised.");
             switch (op)
             {
                 case "poll": return Poll();
@@ -80,9 +81,13 @@ namespace FileXfer
                 case "pickFiles": return StartJob("pickFiles", () => Pick(false));
                 case "pickFolder": return StartJob("pickFolder", () => Pick(true));
                 case "send.start":
-                    if (OptionalText(r, "layout") == "fx2") return StartJob("send.start", () => StartFx2(Int(r, "fps"), Text(r, "ec")));
+                    if (OptionalText(r, "layout") == "fx2") return StartJob("send.start", () => StartFx2(Int(r, "fps"), Text(r, "ec"), Bool(r, "color")));
                     return StartJob("send.start", () => StartSending(Int(r, "frameBytes"), Int(r, "fps"), Text(r, "ec"), Int(r, "columns", 1), Int(r, "rows", 1)));
                 case "send.fx2layout": return DescribeFx2Layout(Int(r, "width"), Int(r, "height"), Int(r, "cell"), Int(r, "coarse", 0));
+                case "send.presentation":
+                    PresentationFullscreen = Bool(r, "fullscreen");
+                    SetPresentationFullscreen(PresentationFullscreen);
+                    return new { Ok = true };
                 case "send.stop": StopSending(); return new { Stopped = true };
                 case "cameras": return new { Cameras = Cameras() };
                 case "receive.start": return StartReceiving(OptionalText(r, "camera"), Int(r, "width"), Int(r, "fps"), Int(r, "workers"), Bool(r, "openWhenDone"));
@@ -99,7 +104,7 @@ namespace FileXfer
         private static string SafeOperation(string op) {
             switch (op) {
                 case "init": case "folder": case "folder.reload": case "select": case "selectAll":
-                case "pickFiles": case "pickFolder": case "send.start": case "send.stop": case "send.fx2layout": case "cameras":
+                case "pickFiles": case "pickFolder": case "send.start": case "send.stop": case "send.fx2layout": case "send.presentation": case "cameras":
                 case "receive.start": case "receive.stop": case "openFolder": case "remote.entry":
                 case "remote.list": case "remote.command": case "poll": case "job": case "receive.status": case "diagnostics": return op;
                 default: return "unknown";
@@ -158,7 +163,7 @@ namespace FileXfer
                 ServerError = _serverError,
                 AutoSend = _autoSend == null ? null : new { Fps = _autoSend.FramesPerSecond, FrameBytes = _autoSend.FrameBytes,
                     Ec = _autoSend.ErrorCorrection, QrSize = _autoSend.QrSize, Columns = _autoSend.Columns, Rows = _autoSend.Rows,
-                    Layout = _autoSend.Layout, Cell = _autoSend.Cell, Coarse = _autoSend.Coarse,
+                    Layout = _autoSend.Layout, Cell = _autoSend.Cell, Coarse = _autoSend.Coarse, Color = _autoSend.Color,
                     KeystoneX = _autoSend.KeystoneX, KeystoneY = _autoSend.KeystoneY },
                 AutoReceive = _autoReceive == null ? null : new { Camera = _autoReceive.Camera, Width = _autoReceive.Width, Fps = _autoReceive.FramesPerSecond, Workers = _autoReceive.Workers }
             };
@@ -179,7 +184,7 @@ namespace FileXfer
             public object AutoReceive { get; set; }
         }
 
-        /// <summary>The local server is what the phone talks to. A FileXfer already running on the port is replaced,
+        /// <summary>The local server is what the phone talks to. A Xfer already running on the port is replaced,
         /// as the launcher did; anything else on the port leaves this window working without the phone.</summary>
         private void StartServer()
         {
@@ -187,11 +192,11 @@ namespace FileXfer
             {
                 StaticAssets.Initialize(_home, null);
                 int running; string discovery;
-                if (Program.TryFindRunningFileXfer(_port, _home, out running, out discovery))
+                if (Program.TryFindRunningXfer(_port, _home, out running, out discovery))
                 {
                     string stopError;
-                    if (discovery != null || !Program.TryStopRunningFileXfer(_port, running, out stopError))
-                        throw new InvalidOperationException("前に起動した FileXfer を止められませんでした。");
+                    if (discovery != null || !Program.TryStopRunningXfer(_port, running, out stopError))
+                        throw new InvalidOperationException("前に起動した Xfer を止められませんでした。");
                 }
                 _serverStop = new CancellationTokenSource();
                 var server = new LocalServer(_port, _state, "optical", _output, delegate { _shutdownRequested = true; });
@@ -390,14 +395,14 @@ namespace FileXfer
 
         /// <summary>Starts an FX2 display session. The page asks for the layout of its window (send.fx2layout) and
         /// advances the sequence by that layout's patch count per display tick.</summary>
-        private object StartFx2(int fps, string ec)
+        private object StartFx2(int fps, string ec, bool color)
         {
             FolderSnapshot folder; List<string> names;
             lock (_gate) { folder = _folder; names = SelectedNames(); }
             if (names.Count == 0) throw new ArgumentException("送るファイルを選んでください。");
             StopSending();
-            var result = _optical.StartFx2(folder, names, fps, ec);
-            lock (_gate) _fx2 = new Fx2Stream(_optical, result.Token, ec);
+            var result = _optical.StartFx2(folder, names, fps, ec, color);
+            lock (_gate) _fx2 = new Fx2Stream(_optical, result.Token, ec, color);
             return new
             {
                 result.TransferId, result.Token, result.Label, result.FileCount, result.OriginalBytes, result.FrameBytes, result.FramesPerSecond,
@@ -447,11 +452,12 @@ namespace FileXfer
 
         /// <summary>Bring this window forward (Windows); nothing elsewhere.</summary>
         static partial void RaiseWindow();
+        static partial void SetPresentationFullscreen(bool fullscreen);
 
         private object RemoteEntry()
         {
             var server = _server;
-            if (server == null) throw new InvalidOperationException(_serverError ?? "FileXfer のサーバーが動いていません。");
+            if (server == null) throw new InvalidOperationException(_serverError ?? "Xfer のサーバーが動いていません。");
             string url = null;
             foreach (var device in server.Tailnet.ReadAsync().GetAwaiter().GetResult())
                 if (device.Current && !string.IsNullOrWhiteSpace(device.Url)) { url = device.Url; break; }
@@ -468,7 +474,7 @@ namespace FileXfer
 
         private object RemoteCommand(string action, int frameBytes, int fps, string ec, int displaySize)
         {
-            if (_server == null) throw new InvalidOperationException(_serverError ?? "FileXfer のサーバーが動いていません。");
+            if (_server == null) throw new InvalidOperationException(_serverError ?? "Xfer のサーバーが動いていません。");
             List<string> names = null;
             if (action == "showQr")
             {
@@ -496,16 +502,16 @@ namespace FileXfer
                     {
                         QrStream qr;
                         lock (_gate) qr = _qr;
-                        uint seq;
-                        if (qr == null || Query(query, "t") != qr.Token || !uint.TryParse(Query(query, "s"), NumberStyles.None, CultureInfo.InvariantCulture, out seq)) return null;
+                        ulong seq;
+                        if (qr == null || Query(query, "t") != qr.Token || !ulong.TryParse(Query(query, "s"), NumberStyles.None, CultureInfo.InvariantCulture, out seq)) return null;
                         return Keystone(qr.Tiles(seq, Scale(query), Count(query, "c", TiledQr.MaximumColumns), Count(query, "r", TiledQr.MaximumRows)), query);
                     }
                 case "fx2":
                     {
                         Fx2Stream fx2;
                         lock (_gate) fx2 = _fx2;
-                        uint seq;
-                        if (fx2 == null || Query(query, "t") != fx2.Token || !uint.TryParse(Query(query, "s"), NumberStyles.None, CultureInfo.InvariantCulture, out seq)) return null;
+                        ulong seq;
+                        if (fx2 == null || Query(query, "t") != fx2.Token || !ulong.TryParse(Query(query, "s"), NumberStyles.None, CultureInfo.InvariantCulture, out seq)) return null;
                         int width = Count(query, "w", 16384), height = Count(query, "h", 16384), cell = Count(query, "m", Fx2Layout.MaximumCell), coarse = Count(query, "k", 4);
                         if ((long)width * height > 64L * 1024 * 1024 / 4) return null;
                         var layout = fx2.Layout(width, height, cell, coarse);
@@ -595,6 +601,8 @@ namespace FileXfer
             Diagnostics.Event("app.stop", "native", null);
             StopReceiving();
             StopSending();
+            _optical.Dispose();
+            if (_receiver != null) _receiver.Dispose();
             if (_serverStop != null) _serverStop.Cancel();
             if (_server != null) _server.Dispose();
         }

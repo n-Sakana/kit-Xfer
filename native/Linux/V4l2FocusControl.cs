@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>Focus controls on the same V4L2 device ffmpeg captures. No v4l2-ctl dependency.
     /// Camera-class controls use G/S_EXT_CTRLS; layout/request numbers below are for Linux x64/arm64.</summary>

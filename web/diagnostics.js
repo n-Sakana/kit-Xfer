@@ -4,9 +4,9 @@
   var run = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(16) + Math.random().toString(16).slice(2);
   var device = run;
   try {
-    var savedDevice = localStorage.getItem("FileXfer-diagnostic-device");
+    var savedDevice = localStorage.getItem("Xfer-diagnostic-device");
     if (savedDevice && /^[a-f0-9.-]{8,80}$/i.test(savedDevice)) device = savedDevice;
-    else localStorage.setItem("FileXfer-diagnostic-device", device);
+    else localStorage.setItem("Xfer-diagnostic-device", device);
   } catch (_) { /* page-run identity still works when origin storage is unavailable */ }
   var pending = [], samples = new Map(), active = new Map(), seq = 0, dropped = 0;
   var database = null, writing = null, storageFailures = 0, requestSeq = 0;
@@ -14,7 +14,7 @@
   var boot = performance.now(), lastTick = boot, sampler = null;
   var opening = new Promise(function (resolve) {
     try {
-      var request = indexedDB.open("FileXfer-diagnostics", 2);
+      var request = indexedDB.open("Xfer-diagnostics", 2);
       request.onupgradeneeded = function () {
         ["events", "incidents"].forEach(function (name) {
           if (!request.result.objectStoreNames.contains(name)) request.result.createObjectStore(name, { autoIncrement: true });
@@ -132,7 +132,7 @@
         var controller = new AbortController(), timeout = setTimeout(function () { controller.abort(); }, 4000);
         try {
           var response = await fetch("/api/diagnostics", { method: "POST", credentials: "same-origin", signal: controller.signal,
-            headers: { "Content-Type": "application/json", "X-FileXfer-Diagnostics": "1" },
+            headers: { "Content-Type": "application/json", "X-Xfer-Diagnostics": "1" },
             body: JSON.stringify({ archive: name === "incidents", records: batch.map(function (item) { return item.record; }) }) });
           if (!response.ok) return;
           var ack = await response.json();
@@ -164,7 +164,7 @@
   function fetchObserved(url, options) {
     var settings = Object.assign({}, options || {});
     settings.headers = new Headers(settings.headers || {});
-    settings.headers.set("X-FileXfer-Trace", run);
+    settings.headers.set("X-Xfer-Trace", run);
     var end = begin("http.headers", route(url));
     return fetch(url, settings).then(function (response) { end(response.status, !response.ok); return response; },
       function (error) { end(0, true); throw error; });
@@ -182,18 +182,18 @@
     });
     return records.concat(pending).slice(database ? -retention : -128).map(function (record) { return JSON.stringify(record); }).join("\n") + "\n";
   }
-  window.FileXferDiagnostics = { event: event, sample: sample, begin: begin, id: id, route: route,
+  window.XferDiagnostics = { event: event, sample: sample, begin: begin, id: id, route: route,
     transfer: function (session) { return String(session || "").split(":").slice(0, 4).join(":"); },
     fetch: fetchObserved, flush: flush, exportJsonl: exportJsonl,
     observe: function (fn) { sampler = fn; },
     download: async function () {
       var url = URL.createObjectURL(new Blob([await exportJsonl()], { type: "application/x-ndjson" }));
-      var link = document.createElement("a"); link.href = url; link.download = "FileXfer-browser-log.jsonl"; link.click();
+      var link = document.createElement("a"); link.href = url; link.download = "Xfer-browser-log.jsonl"; link.click();
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
   };
   var agent = navigator.userAgent || "", browser = agent.match(/(Firefox|Edg|Chrome|Version)\/([\d.]+)/);
-  var environment = { device: device, build: "__FileXfer_BUILD_ID__", browser: browser ? browser[0] : "unknown",
+  var environment = { device: device, build: "__Xfer_BUILD_ID__", browser: browser ? browser[0] : "unknown",
     os: /Android/.test(agent) ? "Android" : /iPhone|iPad/.test(agent) ? "iOS" : /Windows/.test(agent) ? "Windows" : /Mac OS/.test(agent) ? "macOS" : "other",
     cpus: navigator.hardwareConcurrency || 0, dpr: devicePixelRatio, width: screen.width, height: screen.height,
     standalone: !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) };

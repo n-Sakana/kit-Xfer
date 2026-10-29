@@ -9,18 +9,26 @@ using ZXing;
 using ZXing.Common;
 using ZXing.QrCode.Internal;
 
-namespace FileXfer
+namespace Xfer
 {
-    internal sealed class OpticalService
+    internal sealed class OpticalService : IDisposable
     {
         private const int MinimumFrameBytes = 64;
         private const int MaximumFrameBytes = 2953;
         private const int FrameHeaderLength = 20;
-        private const int MaximumFiles = 2000;
-        private const int MaximumBundleBytes = 64 * 1024 * 1024;
         private static readonly int[] FrameBytesOptions =
             { 500, 1000, 1465, 1850, 2331, 2953 };
 
+        public void Dispose()
+        {
+            lock (_gate) {
+                _disposed = true;
+                foreach (var session in _sessions.Values) session.Dispose();
+                _sessions.Clear();
+            }
+        }
+
+        private bool _disposed;
         private readonly object _gate = new object();
         // A remote command can reach more than one display. Do not invalidate
         // another display's token when a new display starts.
@@ -70,34 +78,34 @@ namespace FileXfer
             var payload = OpticalPayload.Build(
                 source,
                 selectedNames,
-                MaximumFiles,
-                MaximumBundleBytes,
                 preparation);
             frameBytes = Math.Min(frameBytes, MaximumBytesForCorrection(errorCorrection));
             // Tiny transfers need not be padded into a version-40 QR.
             frameBytes = Math.Max(MinimumFrameBytes,
-                Math.Min(frameBytes, payload.Bytes.Length + FrameHeaderLength));
-            frameBytes = RaiseFrameBytesIfNeeded(payload.Bytes.Length, frameBytes,
+                (int)Math.Min(frameBytes, payload.Length + FrameHeaderLength));
+            if (payload.Streaming == null) frameBytes = RaiseFrameBytesIfNeeded((int)payload.Length, frameBytes,
                 MaximumBytesForCorrection(errorCorrection));
             var session = new OpticalSession(
                 payload,
                 frameBytes,
                 framesPerSecond,
                 errorCorrection);
-            session.ValidateFirstFrame();
+            try { session.ValidateFirstFrame(); } catch { session.Dispose(); throw; }
 
             lock (_gate)
             {
+                if (_disposed) { session.Dispose(); throw new ObjectDisposedException("OpticalService"); }
                 PruneSessions();
                 if (_sessions.Count >= 4)
                 {
+                    session.Dispose();
                     throw new ArgumentException("QR 表示が多すぎます。不要な表示を閉じてください。");
                 }
                 _sessions.Add(session.Describe().Token, session);
             }
 
             Diagnostics.Event("send.ready", session.TransferId, new { Preparation = preparation, Files = payload.FileCount,
-                OriginalBytes = payload.OriginalBytes, TransmittedBytes = payload.Bytes.Length,
+                OriginalBytes = payload.OriginalBytes, TransmittedBytes = payload.Length,
                 FrameBytes = frameBytes, Fps = framesPerSecond, Ec = errorCorrection, QrVersion = session.Describe().QrVersion });
             return session.Describe();
         }
@@ -105,7 +113,7 @@ namespace FileXfer
         /// <summary>Starts an FX2 display session: every patch carries one fountain frame of the size the
         /// error-correction level leaves (see Fx2Code). FX2 frames are small, so a session may have more blocks than
         /// a QR transfer (OpticalFrame.MaximumBlocks).</summary>
-        public OpticalStartResult StartFx2(FolderSnapshot source, IList<string> selectedNames, int framesPerSecond, string errorCorrection)
+        public OpticalStartResult StartFx2(FolderSnapshot source, IList<string> selectedNames, int framesPerSecond, string errorCorrection, bool color = false)
         {
             var stamp = Diagnostics.Stamp();
             var preparation = Guid.NewGuid().ToString("N");
@@ -115,16 +123,17 @@ namespace FileXfer
             {
                 if (framesPerSecond < 1 || framesPerSecond > 60) throw new ArgumentException("1 秒あたりの枚数が正しくありません。", "framesPerSecond");
                 var code = Fx2Code.ForLevel(Fx2Code.ParseLevel(errorCorrection));
-                var payload = OpticalPayload.Build(source, selectedNames, MaximumFiles, MaximumBundleBytes, preparation);
-                var session = new OpticalSession(payload, code.FrameBytes, framesPerSecond, errorCorrection, true);
+                var payload = OpticalPayload.Build(source, selectedNames, preparation);
+                var session = new OpticalSession(payload, code.FrameBytes + (color ? Fx2Code.ForColor(code.Level).FrameBytes - 4 : 0), framesPerSecond, errorCorrection, true);
                 lock (_gate)
                 {
+                    if (_disposed) { session.Dispose(); throw new ObjectDisposedException("OpticalService"); }
                     PruneSessions();
-                    if (_sessions.Count >= 4) throw new ArgumentException("QR 表示が多すぎます。不要な表示を閉じてください。");
+                    if (_sessions.Count >= 4) { session.Dispose(); throw new ArgumentException("QR 表示が多すぎます。不要な表示を閉じてください。"); }
                     _sessions.Add(session.Describe().Token, session);
                 }
                 Diagnostics.Event("send.ready", session.TransferId, new { Preparation = preparation, Layout = "fx2", Files = payload.FileCount,
-                    OriginalBytes = payload.OriginalBytes, TransmittedBytes = payload.Bytes.Length, FrameBytes = code.FrameBytes,
+                    OriginalBytes = payload.OriginalBytes, TransmittedBytes = payload.Length, FrameBytes = session.Describe().FrameBytes, Color = color,
                     Fps = framesPerSecond, Ec = errorCorrection });
                 return session.Describe();
             }
@@ -133,7 +142,7 @@ namespace FileXfer
         }
 
         /// <summary>The fountain frame (header and block) for a sequence number, as an FX2 patch carries it.</summary>
-        public bool TryFrame(string token, uint sequence, out byte[] frame)
+        public bool TryFrame(string token, ulong sequence, out byte[] frame)
         {
             OpticalSession session;
             lock (_gate) { session = FindSession(token); }
@@ -189,7 +198,7 @@ namespace FileXfer
 
         public bool TryRenderFrame(
             string token,
-            uint sequence,
+            ulong sequence,
             out byte[] svg)
         {
             OpticalSession session;
@@ -210,7 +219,7 @@ namespace FileXfer
 
         public bool TryRenderRasterFrame(
             string token,
-            uint sequence,
+            ulong sequence,
             out byte[] rgba)
         {
             OpticalSession session;
@@ -236,7 +245,7 @@ namespace FileXfer
                 if (!string.IsNullOrEmpty(token))
                 {
                     OpticalSession ended;
-                    if (_sessions.TryGetValue(token, out ended)) Diagnostics.Event("send.stopped", ended.TransferId, null);
+                    if (_sessions.TryGetValue(token, out ended)) { Diagnostics.Event("send.stopped", ended.TransferId, null); ended.Dispose(); }
                     _sessions.Remove(token);
                 }
             }
@@ -250,7 +259,7 @@ namespace FileXfer
             }
         }
 
-        public bool TryRenderPackedFrames(string token, uint sequence, int count, out byte[] packed)
+        public bool TryRenderPackedFrames(string token, ulong sequence, int count, out byte[] packed)
         {
             if (count < 1 || count > 16)
             {
@@ -264,6 +273,7 @@ namespace FileXfer
 
         private OpticalSession FindSession(string token)
         {
+            if (_disposed) return null;
             PruneSessions();
             OpticalSession session;
             if (string.IsNullOrEmpty(token) || !_sessions.TryGetValue(token, out session))
@@ -284,6 +294,7 @@ namespace FileXfer
             }
             foreach (var token in expired) {
                 Diagnostics.Event("send.expired", _sessions[token].TransferId, null);
+                _sessions[token].Dispose();
                 _sessions.Remove(token);
             }
         }
@@ -313,7 +324,7 @@ namespace FileXfer
         }
     }
 
-    internal sealed class OpticalSession
+    internal sealed class OpticalSession : IDisposable
     {
         private const int FrameHeaderLength = 20;
         private const int QuietZone = 4;
@@ -325,6 +336,8 @@ namespace FileXfer
         private readonly string _errorCorrectionName;
         private readonly ErrorCorrectionLevel _errorCorrection;
         private readonly byte[] _payload;
+        private readonly StreamingEncoder _streaming;
+        private readonly long _length;
         private readonly FountainEncoder _encoder;
         private readonly uint _payloadFnv;
         private readonly bool _fx2;
@@ -346,6 +359,14 @@ namespace FileXfer
             _errorCorrection = fx2 ? ErrorCorrectionLevel.L : ParseErrorCorrection(errorCorrection);
             _fx2 = fx2;
             _payload = payload.Bytes;
+            _length = payload.Length;
+            Label = payload.Label; FileCount = payload.FileCount; OriginalBytes = payload.OriginalBytes;
+            if (payload.Streaming != null)
+            {
+                _streaming = new StreamingEncoder(payload.Streaming, frameBytes);
+                TransferId = _streaming.Id;
+                return;
+            }
             _encoder = new FountainEncoder(
                 _payload,
                 frameBytes - FrameHeaderLength,
@@ -364,10 +385,12 @@ namespace FileXfer
             OriginalBytes = payload.OriginalBytes;
         }
 
+        public void Dispose() { if (_streaming != null) _streaming.Dispose(); }
+
         public string TransferId { get; private set; }
         public DateTime LastUsedUtc { get; set; }
         public string Label { get; private set; }
-        public int FileCount { get; private set; }
+        public long FileCount { get; private set; }
         public long OriginalBytes { get; private set; }
 
         public bool Matches(string token)
@@ -392,40 +415,41 @@ namespace FileXfer
                 Label,
                 FileCount,
                 OriginalBytes,
-                _payload.LongLength,
+                _length,
                 _frameBytes,
                 _framesPerSecond,
                 _errorCorrectionName,
-                _encoder.BlockCount,
+                _streaming == null ? _encoder.BlockCount : _streaming.Blocks,
                 _qrVersion,
-                (double)_encoder.BlockCount / _framesPerSecond);
+                (double)(_streaming == null ? _encoder.BlockCount : _streaming.Blocks) / _framesPerSecond);
             result.TransferId = TransferId;
             return result;
         }
 
         /// <summary>The fountain frame for a sequence number without a QR code (FX2 patches).</summary>
-        public byte[] Frame(uint sequence)
+        public byte[] Frame(ulong sequence)
         {
-            var block = _encoder.Encode(sequence);
+            if (_streaming != null) return _streaming.Frame(sequence);
+            var block = _encoder.Encode(unchecked((uint)sequence));
             var frame = new byte[FrameHeaderLength + block.Length];
             WriteHeader(frame, sequence);
             Buffer.BlockCopy(block, 0, frame, FrameHeaderLength, block.Length);
             return frame;
         }
 
-        private void WriteHeader(byte[] frame, uint sequence)
+        private void WriteHeader(byte[] frame, ulong sequence)
         {
             frame[0] = 0xd1;
             frame[1] = 0x0c;
             WriteUInt16(frame, 2, _sessionId);
-            WriteUInt32(frame, 4, sequence);
+            WriteUInt32(frame, 4, unchecked((uint)sequence));
             WriteUInt16(frame, 8, _fx2 ? unchecked((ushort)_encoder.BlockCount) : checked((ushort)_encoder.BlockCount));
             WriteUInt16(frame, 10, checked((ushort)_encoder.BlockLength));
             WriteUInt32(frame, 12, checked((uint)_payload.Length));
             WriteUInt32(frame, 16, _payloadFnv);
         }
 
-        public byte[] RenderFrame(uint sequence)
+        public byte[] RenderFrame(ulong sequence)
         {
             byte[] frame;
             QRCode qr;
@@ -433,7 +457,7 @@ namespace FileXfer
             return RenderSvg(qr.Matrix, QuietZone);
         }
 
-        public byte[] RenderRasterFrame(uint sequence)
+        public byte[] RenderRasterFrame(ulong sequence)
         {
             byte[] frame;
             QRCode qr;
@@ -444,7 +468,7 @@ namespace FileXfer
         // Local HTTP transport only; the bytes encoded in the optical QR are unchanged.
         // FQR1 | side:u16 LE | count:u16 LE | firstSequence:u32 LE | bitmaps.
         // Each bitmap is row-major, MSB first, one black=1 bit per module, quiet zone included.
-        public byte[] RenderPackedFrames(uint sequence, int count)
+        public byte[] RenderPackedFrames(ulong sequence, int count)
         {
             var side = 17 + 4 * _qrVersion + QuietZone * 2;
             var stride = (side * side + 7) / 8;
@@ -452,7 +476,7 @@ namespace FileXfer
             result[0] = 0x46; result[1] = 0x51; result[2] = 0x52; result[3] = 0x31;
             WriteUInt16(result, 4, checked((ushort)side));
             WriteUInt16(result, 6, checked((ushort)count));
-            WriteUInt32(result, 8, sequence);
+            WriteUInt32(result, 8, unchecked((uint)sequence));
             for (var frameIndex = 0; frameIndex < count; frameIndex++)
             {
                 byte[] frame;
@@ -485,7 +509,7 @@ namespace FileXfer
             return RenderSvg(qr.Matrix, QuietZone);
         }
 
-        private void Encode(uint sequence, out byte[] frame, out QRCode qr)
+        private void Encode(ulong sequence, out byte[] frame, out QRCode qr)
         {
             var stamp = Diagnostics.Stamp();
             try { EncodeCore(sequence, out frame, out qr); }
@@ -493,12 +517,9 @@ namespace FileXfer
             finally { Diagnostics.Sample("send.qr", TransferId, Diagnostics.Milliseconds(stamp), new { Sequence = sequence }); }
         }
 
-        private void EncodeCore(uint sequence, out byte[] frame, out QRCode qr)
+        private void EncodeCore(ulong sequence, out byte[] frame, out QRCode qr)
         {
-            var block = _encoder.Encode(sequence);
-            frame = new byte[FrameHeaderLength + block.Length];
-            WriteHeader(frame, sequence);
-            Buffer.BlockCopy(block, 0, frame, FrameHeaderLength, block.Length);
+            frame = Frame(sequence);
             qr = CreateQr(frame, _errorCorrection, _qrVersion);
             if (_qrVersion > 0 && qr.Version.VersionNumber != _qrVersion)
             {
@@ -948,7 +969,7 @@ namespace FileXfer
 
         private OpticalPayload(
             string label,
-            int fileCount,
+            long fileCount,
             long originalBytes,
             byte[] bytes)
         {
@@ -959,15 +980,15 @@ namespace FileXfer
         }
 
         public string Label { get; private set; }
-        public int FileCount { get; private set; }
+        public long FileCount { get; private set; }
         public long OriginalBytes { get; private set; }
         public byte[] Bytes { get; private set; }
+        public StreamingBundle Streaming { get; private set; }
+        public long Length { get { return Streaming == null ? Bytes.LongLength : Streaming.Length; } }
 
         public static OpticalPayload Build(
             FolderSnapshot source,
             IList<string> selectedNames,
-            int maximumFiles,
-            int maximumBytes,
             string preparation = "")
         {
             var stamp = Diagnostics.Stamp();
@@ -982,11 +1003,14 @@ namespace FileXfer
             }
 
             var selected = Resolve(source, selectedNames);
-            if (selected.Count > maximumFiles)
+            // This is a format/memory threshold, not a transfer limit. Keep the small-transfer wire bytes
+            // and compression unchanged; larger selections use a bounded, disk-backed receiver.
+            long measured = 0, metadata = 0;
+            foreach (var file in selected) { measured = checked(measured + file.Size); metadata += Encoding.UTF8.GetByteCount(file.Name) + 160L; }
+            if (measured > 8 * 1024 * 1024 || metadata > 512 * 1024 || selected.Count > 2000)
             {
-                throw new ArgumentException(string.Format(
-                    "一度に送れるのは {0:N0} ファイルまでです。",
-                    maximumFiles));
+                var stream = new StreamingBundle(source, selectedNames);
+                return new OpticalPayload(stream.Label, stream.FileCount, stream.OriginalBytes, null) { Streaming = stream };
             }
 
             long total = 0;
@@ -995,16 +1019,18 @@ namespace FileXfer
             foreach (var file in selected)
             {
                 var readStamp = Diagnostics.Stamp();
-                var bytes = File.ReadAllBytes(file.FullPath);
+                byte[] bytes;
+                using (var input = File.OpenRead(file.FullPath))
+                {
+                    if (input.Length != file.Size || input.Length > 8 * 1024 * 1024 - total)
+                        throw new IOException("準備中にファイルが変更されました。");
+                    bytes = new byte[(int)input.Length];
+                    StreamingWire.ReadExactly(input, bytes, 0, bytes.Length);
+                    if (input.ReadByte() != -1) throw new IOException("準備中にファイルが変更されました。");
+                }
                 Diagnostics.Sample("send.read_file", preparation, Diagnostics.Milliseconds(readStamp), new { Bytes = bytes.Length });
                 total = checked(total + bytes.LongLength);
-                if (total > maximumBytes)
-                {
-                    throw new ArgumentException(string.Format(
-                        "選んだ内容は合計 {0:N1} MB です。現在は {1:N0} MB まで送れます。",
-                        total / 1024.0 / 1024.0,
-                        maximumBytes / 1024.0 / 1024.0));
-                }
+                if (total > 8 * 1024 * 1024) throw new IOException("準備中にファイルが変更されました。");
                 contents.Add(bytes);
                 manifestFiles.Add(new Dictionary<string, object>
                 {
@@ -1049,7 +1075,7 @@ namespace FileXfer
             return new OpticalPayload(label, selected.Count, total, fileContainer);
         }
 
-        private static List<FolderFile> Resolve(
+        internal static List<FolderFile> Resolve(
             FolderSnapshot source,
             IList<string> names)
         {
@@ -1263,7 +1289,7 @@ namespace FileXfer
             return true;
         }
 
-        private static string SafeLabel(string value)
+        internal static string SafeLabel(string value)
         {
             var invalid = new HashSet<char>(Path.GetInvalidFileNameChars());
             invalid.Add('/');
@@ -1284,7 +1310,7 @@ namespace FileXfer
                 }
             }
             var label = builder.ToString().Trim().TrimEnd('.');
-            return string.IsNullOrWhiteSpace(label) ? "Ferry" : label;
+            return string.IsNullOrWhiteSpace(label) ? "Xfer" : label;
         }
 
         private static void WriteUInt16(byte[] target, int offset, ushort value)
@@ -1307,13 +1333,13 @@ namespace FileXfer
         public OpticalStartResult(
             string token,
             string label,
-            int fileCount,
+            long fileCount,
             long originalBytes,
             long transmittedBytes,
             int frameBytes,
             int framesPerSecond,
             string errorCorrection,
-            int sourceBlocks,
+            long sourceBlocks,
             int qrVersion,
             double minimumSeconds)
         {
@@ -1333,13 +1359,13 @@ namespace FileXfer
         public string TransferId { get; set; }
         public string Token { get; private set; }
         public string Label { get; private set; }
-        public int FileCount { get; private set; }
+        public long FileCount { get; private set; }
         public long OriginalBytes { get; private set; }
         public long TransmittedBytes { get; private set; }
         public int FrameBytes { get; private set; }
         public int FramesPerSecond { get; private set; }
         public string ErrorCorrection { get; private set; }
-        public int SourceBlocks { get; private set; }
+        public long SourceBlocks { get; private set; }
         public int QrVersion { get; private set; }
         public double MinimumSeconds { get; private set; }
     }

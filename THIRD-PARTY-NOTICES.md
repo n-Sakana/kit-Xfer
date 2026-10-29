@@ -1,6 +1,6 @@
 # 第三者ソフトウェアの表示 / Third-party notices
 
-FileXfer は、次の第三者ソフトウェアと書体を基礎とするか、同梱しています。
+Xfer は、次の第三者ソフトウェアと書体を基礎とするか、同梱しています。
 
 ## MiniUI
 
@@ -10,7 +10,7 @@ FileXfer は、次の第三者ソフトウェアと書体を基礎とするか�
 
 ## Decimen Optical Transfer
 
-FileXfer は [bashalarmistalt/decimen-optical-transfer](https://github.com/bashalarmistalt/decimen-optical-transfer)
+Xfer は [bashalarmistalt/decimen-optical-transfer](https://github.com/bashalarmistalt/decimen-optical-transfer)
 v0.3.0 の fork です。上流のワイヤーフォーマットには手を入れていません。
 
 - License: MIT

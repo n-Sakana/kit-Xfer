@@ -1,17 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- FX2 bench without a camera: synthetic camera pictures (perspective, blur, noise, rolling shutter, partial
+       view) through the product's FX2 reader and fountain decoder, and the reader run over saved camera frames. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <LangVersion>5</LangVersion>
-    <StartupObject>FileXfer.Probe</StartupObject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <StartupObject>Xfer.Fx2Lab</StartupObject>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../src/**/*.cs" />
-    <Compile Include="Probe.cs" />
+    <Compile Include="Fx2Lab.cs" />
     <Reference Include="zxing"><HintPath>../lib/zxing.dll</HintPath><Private>true</Private></Reference>
   </ItemGroup>
 </Project>

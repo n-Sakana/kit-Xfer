@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class NativePicker
     {
@@ -34,7 +34,7 @@ namespace FileXfer
                 var owner = GetForegroundWindow();
                 return RunSta(
                     delegate { return PickWindowsFolder(initialPath, owner); },
-                    "FileXfer folder picker");
+                    "Xfer folder picker");
             }
             if (PlatformInfo.IsLinux)
             {
@@ -52,7 +52,7 @@ namespace FileXfer
                 var owner = GetForegroundWindow();
                 return RunSta(
                     delegate { return PickWindowsFiles(initialPath, mode, owner); },
-                    "FileXfer file picker");
+                    "Xfer file picker");
             }
             if (PlatformInfo.IsLinux)
             {

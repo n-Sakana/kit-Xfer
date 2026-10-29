@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>QR frames of one display session, rendered ahead on a background thread so the page can show a new
     /// frame every display tick without waiting for the fountain encoder and the QR encoder. Frames are kept one bit
@@ -12,9 +12,9 @@ namespace FileXfer
         private const int Ahead = 16;
         private readonly OpticalService _service;
         private readonly object _gate = new object();
-        private readonly Dictionary<uint, byte[]> _ready = new Dictionary<uint, byte[]>();
+        private readonly Dictionary<ulong, byte[]> _ready = new Dictionary<ulong, byte[]>();
         private readonly Thread _worker;
-        private uint _wanted;
+        private ulong _wanted;
         private bool _stopped;
         private string _error;
 
@@ -24,7 +24,7 @@ namespace FileXfer
         public QrStream(OpticalService service, string token)
         {
             _service = service; Token = token; TransferId = service.DiagnosticTransfer(token);
-            _worker = new Thread(Run) { IsBackground = true, Name = "FileXfer QR frames", Priority = ThreadPriority.AboveNormal };
+            _worker = new Thread(Run) { IsBackground = true, Name = "Xfer QR frames", Priority = ThreadPriority.AboveNormal };
             _worker.Start();
         }
 
@@ -32,23 +32,23 @@ namespace FileXfer
 
         /// <summary>Frames sequence, sequence+1, ... laid out columns x rows (row-major) in one image, or the single
         /// frame when 1 x 1.</summary>
-        public IAppImage Tiles(uint sequence, int scale, int columns, int rows)
+        public IAppImage Tiles(ulong sequence, int scale, int columns, int rows)
         {
             if (columns == 1 && rows == 1) return Frame(sequence, scale);
             var tiles = new ScaledQr[columns * rows];
-            for (int i = 0; i < tiles.Length; i++) tiles[i] = Frame(unchecked(sequence + (uint)i), scale);
+            for (int i = 0; i < tiles.Length; i++) tiles[i] = Frame(unchecked(sequence + (ulong)i), scale);
             return new TiledQr(tiles, columns, rows);
         }
 
         /// <summary>The frame for this sequence number at scale pixels per module (rendered now when not ready yet).</summary>
-        public ScaledQr Frame(uint sequence, int scale)
+        public ScaledQr Frame(ulong sequence, int scale)
         {
             var stamp = Diagnostics.Stamp();
             byte[] frame;
             lock (_gate)
             {
                 _wanted = sequence;
-                foreach (var old in new List<uint>(_ready.Keys)) if (unchecked(old - sequence) > Ahead) _ready.Remove(old);
+                foreach (var old in new List<ulong>(_ready.Keys)) if (unchecked(old - sequence) > Ahead) _ready.Remove(old);
                 _ready.TryGetValue(sequence, out frame);
                 Monitor.PulseAll(_gate);
             }
@@ -62,7 +62,7 @@ namespace FileXfer
             return ScaledQr.FromPacked(frame, scale);
         }
 
-        private byte[] Render(uint sequence)
+        private byte[] Render(ulong sequence)
         {
             byte[] packed;
             if (!_service.TryRenderPackedFrames(Token, sequence, 1, out packed)) throw new InvalidOperationException("QR の表示は終了しました。");
@@ -73,7 +73,7 @@ namespace FileXfer
         {
             while (true)
             {
-                uint next;
+                ulong next;
                 lock (_gate)
                 {
                     while (!_stopped && !NeedsWork(out next)) Monitor.Wait(_gate, 200);
@@ -94,9 +94,9 @@ namespace FileXfer
             }
         }
 
-        private bool NeedsWork(out uint next)
+        private bool NeedsWork(out ulong next)
         {
-            for (uint i = 1; i <= Ahead; i++)
+            for (ulong i = 1; i <= Ahead; i++)
             {
                 next = unchecked(_wanted + i);
                 if (!_ready.ContainsKey(next)) return true;

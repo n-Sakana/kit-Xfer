@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+Xfer_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -e /etc/NIXOS ]]; then
+  exec "$Xfer_root/tools/linux/run-nixos.sh" "$@"
+fi
+exec "$Xfer_root/Xfer.sh" "$@"

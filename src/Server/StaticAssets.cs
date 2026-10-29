@@ -5,11 +5,11 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class StaticAssets
     {
-        private const string BuildIdPlaceholder = "__FileXfer_BUILD_ID__";
+        private const string BuildIdPlaceholder = "__Xfer_BUILD_ID__";
 
         private static Dictionary<string, Asset> _assets;
 
@@ -17,7 +17,7 @@ namespace FileXfer
         {
             if (string.IsNullOrWhiteSpace(appDirectory))
             {
-                throw new ArgumentException("FileXfer's application folder is missing.", "appDirectory");
+                throw new ArgumentException("Xfer's application folder is missing.", "appDirectory");
             }
 
             var webDirectory = Path.Combine(Path.GetFullPath(appDirectory), "web");
@@ -65,14 +65,14 @@ namespace FileXfer
             Asset index;
             if (!_assets.TryGetValue("/index.html", out index))
             {
-                throw new InvalidOperationException("FileXfer's index page is missing.");
+                throw new InvalidOperationException("Xfer's index page is missing.");
             }
 
             var html = Encoding.UTF8.GetString(index.Bytes);
             if (html.IndexOf(BuildIdPlaceholder, StringComparison.Ordinal) < 0)
             {
                 throw new InvalidOperationException(
-                    "FileXfer's index page is missing the static asset build identifier.");
+                    "Xfer's index page is missing the static asset build identifier.");
             }
 
             var escapedBuildId = Uri.EscapeDataString(buildId);
@@ -156,7 +156,7 @@ namespace FileXfer
                     continue;
                 }
 
-                using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("FileXfer.Fonts." + name))
+                using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Xfer.Fonts." + name))
                 {
                     if (stream == null)
                     {
@@ -188,17 +188,17 @@ namespace FileXfer
         {
             return new Dictionary<string, Asset>(StringComparer.Ordinal)
             {
-                { "/index.html", LoadResource("FileXfer.Web.index.html", "text/html; charset=utf-8", false) },
-                { "/app.css", LoadResource("FileXfer.Web.app.css", "text/css; charset=utf-8", true) },
-                { "/optical-core.js", LoadResource("FileXfer.Web.optical-core.js", "text/javascript; charset=utf-8", true) },
-                { "/zxing-reader.js", LoadResource("FileXfer.Web.zxing-reader.js", "text/javascript; charset=utf-8", true) },
-                { "/diagnostics.js", LoadResource("FileXfer.Web.diagnostics.js", "text/javascript; charset=utf-8", true) },
-                { "/app.js", LoadResource("FileXfer.Web.app.js", "text/javascript; charset=utf-8", true) },
-                { "/qr-worker.js", LoadResource("FileXfer.Web.qr-worker.js", "text/javascript; charset=utf-8", true) },
-                { "/zxing_reader-EOacYbLr.wasm", LoadResource("FileXfer.Web.zxing_reader-EOacYbLr.wasm", "application/wasm", true) },
-                { "/icon.svg", LoadResource("FileXfer.Web.icon.svg", "image/svg+xml", true) },
-                { "/manifest.webmanifest", LoadResource("FileXfer.Web.manifest.webmanifest", "application/manifest+json; charset=utf-8", true) },
-                { "/service-worker.js", LoadResource("FileXfer.Web.service-worker.js", "text/javascript; charset=utf-8", true) }
+                { "/index.html", LoadResource("Xfer.Web.index.html", "text/html; charset=utf-8", false) },
+                { "/app.css", LoadResource("Xfer.Web.app.css", "text/css; charset=utf-8", true) },
+                { "/optical-core.js", LoadResource("Xfer.Web.optical-core.js", "text/javascript; charset=utf-8", true) },
+                { "/zxing-reader.js", LoadResource("Xfer.Web.zxing-reader.js", "text/javascript; charset=utf-8", true) },
+                { "/diagnostics.js", LoadResource("Xfer.Web.diagnostics.js", "text/javascript; charset=utf-8", true) },
+                { "/app.js", LoadResource("Xfer.Web.app.js", "text/javascript; charset=utf-8", true) },
+                { "/qr-worker.js", LoadResource("Xfer.Web.qr-worker.js", "text/javascript; charset=utf-8", true) },
+                { "/zxing_reader-EOacYbLr.wasm", LoadResource("Xfer.Web.zxing_reader-EOacYbLr.wasm", "application/wasm", true) },
+                { "/icon.svg", LoadResource("Xfer.Web.icon.svg", "image/svg+xml", true) },
+                { "/manifest.webmanifest", LoadResource("Xfer.Web.manifest.webmanifest", "application/manifest+json; charset=utf-8", true) },
+                { "/service-worker.js", LoadResource("Xfer.Web.service-worker.js", "text/javascript; charset=utf-8", true) }
             };
         }
 

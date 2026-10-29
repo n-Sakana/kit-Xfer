@@ -1,4 +1,4 @@
-"""Summarise receptions from FileXfer diagnostic traces (trace-*.jsonl), for before/after comparisons.
+"""Summarise receptions from Xfer diagnostic traces (trace-*.jsonl), for before/after comparisons.
 
 python tests/receive_report.py TRACE_OR_FOLDER [...] [--table]
 

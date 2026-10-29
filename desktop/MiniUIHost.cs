@@ -9,9 +9,9 @@ using MiniUI.Core;
 using MiniUI.Core.Engine;
 using MiniUI.Platform.Linux;
 
-namespace FileXfer;
+namespace Xfer;
 
-/// <summary>FileXfer on Linux: MiniUI (GTK3/X11) shows ui/index.html, the same page as on Windows, and NativeApp
+/// <summary>Xfer on Linux: MiniUI (GTK3/X11) shows ui/index.html, the same page as on Windows, and NativeApp
 /// answers its uiHost.call and app: images in this process (the Windows build loads the same code as MiniUI.App.dll).
 /// --no-browser and --help run only the HTTP server, as before. --window-at X,Y (X11 pixels), --window WxH and
 /// --fullscreen place the window from the command line (measurement set-ups on a desktop that takes no remote
@@ -22,7 +22,7 @@ internal static class MiniUIHost
     {
         Diagnostics.Event("host.start", "native-linux", null);
         try { return Run(args); }
-        catch (Exception e) { Diagnostics.Failure("host.run", "native-linux", e); Console.Error.WriteLine("FileXfer: " + e.Message); return 1; }
+        catch (Exception e) { Diagnostics.Failure("host.run", "native-linux", e); Console.Error.WriteLine("Xfer: " + e.Message); return 1; }
         finally { Diagnostics.Event("host.exit", "native-linux", null); }
     }
 
@@ -59,7 +59,7 @@ internal static class MiniUIHost
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISPLAY")))
             throw new InvalidOperationException("X11 の DISPLAY がありません。デスクトップの端末から起動してください。");
         stateDir ??= Path.Combine(Environment.GetEnvironmentVariable("XDG_STATE_HOME") ??
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "state"), "FileXfer", "miniui");
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "state"), "Xfer", "miniui");
         Directory.CreateDirectory(stateDir);
 
         var native = NativeApp.Instance;
@@ -67,7 +67,7 @@ internal static class MiniUIHost
         arguments.AddRange(appArgs);
         var options = new EngineOptions
         {
-            Root = Path.GetDirectoryName(entry)!, StateDir = stateDir, Width = 1180, Height = 800, Title = "FileXfer", Mcp = mcp,
+            Root = Path.GetDirectoryName(entry)!, StateDir = stateDir, Width = 1180, Height = 800, Title = "Xfer", Mcp = mcp,
             HostCall = native.Call, HostImage = name => Image(native.Image(name)), Arguments = arguments.ToArray()
         };
 
@@ -92,6 +92,7 @@ internal static class MiniUIHost
             }
             if (windowSize != null) window.ResizeTo(windowSize[0], windowSize[1]);
             bool pendingFullscreen = fullscreen && target != null;
+            bool presentationFullscreen = false;
             if (fullscreen && target == null) window.SetFullscreen(true);
             using var engine = new Engine(window, options);
             engine.ConsoleSink = Console.Error.WriteLine;
@@ -122,6 +123,23 @@ internal static class MiniUIHost
                     }
                 }
                 if (Volatile.Read(ref stopping) != 0 || (duration > 0 && clock.Elapsed.TotalMilliseconds >= duration)) engine.Closed = true;
+                if (!pendingFullscreen && native.PresentationFullscreen != presentationFullscreen)
+                {
+                    if (native.PresentationFullscreen)
+                    {
+                        var bounds = window.GetBounds();
+                        if (target == null || (Math.Abs(bounds.X - target[0]) <= 64 && Math.Abs(bounds.Y - target[1]) <= 64))
+                        {
+                            presentationFullscreen = true;
+                            if (!FullscreenAt((int)Math.Round(bounds.X), (int)Math.Round(bounds.Y))) window.SetFullscreen(true);
+                        }
+                    }
+                    else
+                    {
+                        presentationFullscreen = false;
+                        if (!fullscreen) window.SetFullscreen(false);
+                    }
+                }
                 if (!engine.Closed && !window.Closed) { engine.RunFrame(); SyncIme(); }
                 return !engine.Closed && !window.Closed;
             }
@@ -205,7 +223,7 @@ internal static class MiniUIHost
         return new[] { a, b };
     }
 
-    /// <summary>The FileXfer folder: two levels above artifacts/miniui-linux when that is where this host runs.</summary>
+    /// <summary>The Xfer folder: two levels above artifacts/miniui-linux when that is where this host runs.</summary>
     private static string DefaultHome()
     {
         string here = AppContext.BaseDirectory;

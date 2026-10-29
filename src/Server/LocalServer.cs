@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FileXfer
+namespace Xfer
 {
     internal sealed class LocalServer : IDisposable
     {
@@ -169,6 +169,8 @@ namespace FileXfer
             }
 
             _listener.Close();
+            _optical.Dispose();
+            _opticalReceiver.Dispose();
         }
 
         private async Task HandleSafelyAsync(HttpListenerContext context)
@@ -179,7 +181,7 @@ namespace FileXfer
             }
             var stamp = Diagnostics.Stamp();
             string route = DiagnosticRoute(context.Request.Url == null ? "" : context.Request.Url.AbsolutePath);
-            string client = Diagnostics.Id(context.Request.Headers["X-FileXfer-Trace"]);
+            string client = Diagnostics.Id(context.Request.Headers["X-Xfer-Trace"]);
             Diagnostics.Sample("http.begin", route, 0, new { Client = client });
             try { await HandleObservedAsync(context); }
             finally { Diagnostics.Sample("http.end", route, Diagnostics.Milliseconds(stamp),
@@ -257,7 +259,7 @@ namespace FileXfer
             catch (Exception exception)
             {
                 Diagnostics.Failure("http", DiagnosticRoute(context.Request.Url.AbsolutePath), exception);
-                error = new ErrorBody("FileXfer の処理中にエラーが起きました。");
+                error = new ErrorBody("Xfer の処理中にエラーが起きました。");
             }
 
             if (error != null)
@@ -271,7 +273,7 @@ namespace FileXfer
                 }
                 catch (ObjectDisposedException)
                 {
-                    // The client disconnected while FileXfer was reporting the error.
+                    // The client disconnected while Xfer was reporting the error.
                 }
                 catch (HttpListenerException)
                 {
@@ -313,7 +315,7 @@ namespace FileXfer
                 // Custom header + JSON prevent simple cross-origin posts; no CORS permission is granted.
                 Uri origin;
                 var host = _relay != null ? request.Headers[LoopbackRelay.OriginalHostHeader] : request.Headers["Host"];
-                if (request.Headers["X-FileXfer-Diagnostics"] != "1"
+                if (request.Headers["X-Xfer-Diagnostics"] != "1"
                     || !string.Equals((request.ContentType ?? "").Split(';')[0], "application/json", StringComparison.OrdinalIgnoreCase)
                     || !Uri.TryCreate(request.Headers["Origin"], UriKind.Absolute, out origin)
                     || (origin.Scheme != "http" && origin.Scheme != "https")
@@ -418,7 +420,7 @@ namespace FileXfer
             if (request.HttpMethod == "POST" && path == "/api/remotes/command")
             {
                 RequireLocal(role, "リモコンの操作はこの PC から実行してください。");
-                var body = JsonCodec.ParseObject(await ReadBodyAsync(request));
+                var body = JsonCodec.ParseObject(await ReadBodyAsync(request, SelectionBodyLimit(_state.ReadFolder("optical"))));
                 var action = ReadString(body, "action");
                 List<string> files = null;
                 string format = null;
@@ -461,21 +463,21 @@ namespace FileXfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.Forbidden,
-                        new ErrorBody("FileXfer can only be stopped from this PC."));
+                        new ErrorBody("Xfer can only be stopped from this PC."));
                     return;
                 }
 
                 int expectedProcessId;
                 var currentProcessId = GetCurrentProcessId();
                 if (!int.TryParse(
-                        request.Headers["X-FileXfer-Process-Id"],
+                        request.Headers["X-Xfer-Process-Id"],
                         out expectedProcessId)
                     || expectedProcessId != currentProcessId)
                 {
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.Conflict,
-                        new ErrorBody("The running FileXfer process changed before it could be stopped."));
+                        new ErrorBody("The running Xfer process changed before it could be stopped."));
                     return;
                 }
 
@@ -495,14 +497,14 @@ namespace FileXfer
                 int expectedProcessId;
                 var currentProcessId = GetCurrentProcessId();
                 if (!int.TryParse(
-                        request.Headers["X-FileXfer-Process-Id"],
+                        request.Headers["X-Xfer-Process-Id"],
                         out expectedProcessId)
                     || expectedProcessId != currentProcessId)
                 {
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.Conflict,
-                        new ErrorBody("The running FileXfer process changed before it could be activated."));
+                        new ErrorBody("The running Xfer process changed before it could be activated."));
                     return;
                 }
 
@@ -528,7 +530,7 @@ namespace FileXfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.ServiceUnavailable,
-                        new ErrorBody("FileXfer のデスクトップ画面はまだ利用できません。"));
+                        new ErrorBody("Xfer のデスクトップ画面はまだ利用できません。"));
                     return;
                 }
 
@@ -668,7 +670,8 @@ namespace FileXfer
 
             if (request.HttpMethod == "POST" && path == "/api/optical/start")
             {
-                var body = JsonCodec.ParseObject(await ReadBodyAsync(request));
+                var snapshot = _state.ReadFolder("optical");
+                var body = JsonCodec.ParseObject(await ReadBodyAsync(request, SelectionBodyLimit(snapshot)));
                 var format = ReadString(body, "format");
                 var selectedNames = ReadStringList(body, "files");
                 var frameBytes = ReadInt(body, "frameBytes");
@@ -676,7 +679,6 @@ namespace FileXfer
                 var errorCorrection = body.ContainsKey("errorCorrection")
                     ? ReadString(body, "errorCorrection")
                     : "L";
-                var snapshot = _state.ReadFolder("optical");
                 var result = await Task.Run(delegate
                 {
                     return StartOptical(
@@ -757,9 +759,9 @@ namespace FileXfer
 
             if (request.HttpMethod == "GET" && path == "/api/optical/frames")
             {
-                uint sequence;
+                ulong sequence;
                 int count;
-                if (!uint.TryParse(request.QueryString["seq"],
+                if (!ulong.TryParse(request.QueryString["seq"],
                     System.Globalization.NumberStyles.None,
                     System.Globalization.CultureInfo.InvariantCulture, out sequence)
                     || !int.TryParse(request.QueryString["count"], out count))
@@ -778,13 +780,13 @@ namespace FileXfer
             if (request.HttpMethod == "GET" && path == "/api/optical/frame")
             {
                 var token = request.QueryString["token"];
-                uint sequence;
+                ulong sequence;
                 byte[] frame = null;
                 var raster = string.Equals(
                     request.QueryString["format"],
                     "raster",
                     StringComparison.OrdinalIgnoreCase);
-                var validSequence = uint.TryParse(
+                var validSequence = ulong.TryParse(
                         request.QueryString["seq"],
                         System.Globalization.NumberStyles.None,
                         System.Globalization.CultureInfo.InvariantCulture,
@@ -842,7 +844,7 @@ namespace FileXfer
             var version = Assembly.GetExecutingAssembly().GetName().Version;
             return new
             {
-                Application = "FileXfer",
+                Application = "Xfer",
                 Device = Environment.MachineName,
                 ProcessId = GetCurrentProcessId(),
                 Platform = PlatformInfo.Name,
@@ -1025,9 +1027,18 @@ namespace FileXfer
                 : "remote";
         }
 
-        private static async Task<byte[]> ReadBodyAsync(HttpListenerRequest request)
+        private static long SelectionBodyLimit(FolderSnapshot source)
         {
-            if (request.ContentLength64 > MaximumRequestBytes)
+            // Every selectable path may appear, including worst-case JSON Unicode escaping. The
+            // ordinary 64 KiB request guard must not impose another file-count limit on a selection.
+            long bytes = MaximumRequestBytes;
+            foreach (var file in source.Files) bytes = checked(bytes + 6L * file.Name.Length + 3);
+            return bytes;
+        }
+
+        private static async Task<byte[]> ReadBodyAsync(HttpListenerRequest request, long maximumBytes = MaximumRequestBytes)
+        {
+            if (request.ContentLength64 > maximumBytes)
             {
                 throw new ArgumentException("Request body is too large.");
             }
@@ -1044,7 +1055,7 @@ namespace FileXfer
                     }
 
                     buffer.Write(chunk, 0, read);
-                    if (buffer.Length > MaximumRequestBytes)
+                    if (buffer.Length > maximumBytes)
                     {
                         throw new ArgumentException("Request body is too large.");
                     }

@@ -1,11 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- FileXfer for Linux: the bundled MiniUI engine and GTK3/X11 layer showing ../ui with
-       FileXfer's native component (../native) in the same process. Built by tools/linux/build.sh. -->
+  <!-- Xfer for Linux: the bundled MiniUI engine and GTK3/X11 layer showing ../ui with
+       Xfer's native component (../native) in the same process. Built by tools/linux/build.sh. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <AssemblyName>FileXfer</AssemblyName>
-    <StartupObject>FileXfer.MiniUIHost</StartupObject>
+    <AssemblyName>Xfer</AssemblyName>
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))=/_/Xfer</PathMap>
+    <StartupObject>Xfer.MiniUIHost</StartupObject>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
@@ -18,12 +19,12 @@
     <Compile Include="../native/*.cs;../native/Linux/*.cs" />
     <Compile Include="*.cs" />
     <Reference Include="zxing"><HintPath>../lib/zxing.dll</HintPath><Private>true</Private></Reference>
-    <EmbeddedResource Include="../web/*" LogicalName="FileXfer.Web.%(Filename)%(Extension)" />
-    <EmbeddedResource Include="../ui/fonts/Inter-*.ttf" LogicalName="FileXfer.Fonts.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../web/*" LogicalName="Xfer.Web.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../ui/fonts/Inter-*.ttf" LogicalName="Xfer.Fonts.%(Filename)%(Extension)" />
     <None Include="../runtime/linux-x64/MINIUI_SOURCE_REVISION" Link="MINIUI_SOURCE_REVISION" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../runtime/MiniUI-THIRD-PARTY-NOTICES.md" Link="licenses/MiniUI-THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="CheckMiniUI" BeforeTargets="PrepareForBuild">
-    <Error Condition="!Exists('$(MSBuildThisFileDirectory)../runtime/linux-x64/MiniUI.Core.dll') Or !Exists('$(MSBuildThisFileDirectory)../runtime/linux-x64/MiniUI.Platform.Linux.dll')" Text="The bundled MiniUI DLLs are missing from runtime/linux-x64. Restore them from the FileXfer distribution." />
+    <Error Condition="!Exists('$(MSBuildThisFileDirectory)../runtime/linux-x64/MiniUI.Core.dll') Or !Exists('$(MSBuildThisFileDirectory)../runtime/linux-x64/MiniUI.Platform.Linux.dll')" Text="The bundled MiniUI DLLs are missing from runtime/linux-x64. Restore them from the Xfer distribution." />
   </Target>
 </Project>

@@ -1,14 +1,25 @@
-/* FileXfer optical transport helpers. No external dependencies; optical wire format unchanged. */
+/* Xfer optical transport helpers, including bounded streaming transfers. */
 (function (root, factory) {
   "use strict";
   if (typeof module === "object" && module.exports) module.exports = factory();
-  else root.FileXferOptical = factory();
+  else root.XferOptical = factory();
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
   function parseFrame(value) {
     if (!(value instanceof Uint8Array) && !(value instanceof ArrayBuffer)) return null;
     var bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+    if (bytes.length > 48 && bytes.length <= 2953 && bytes[0] === 0xd1 && bytes[1] === 0x0d) {
+      var stream = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      var block = stream.getUint16(44, true);
+      var total = stream.getUint32(16, true) + stream.getUint32(20, true) * 4294967296;
+      var chunk = stream.getUint32(8, true) + stream.getUint32(12, true) * 4294967296;
+      if (block !== bytes.length - 48 || bytes[46] || bytes[47] || !Number.isSafeInteger(total) || total <= 0 ||
+          chunk < 0 || chunk > Math.floor((total - 1) / 65536) || stream.getUint16(2, true) !== stream.getUint16(24, true)) return null;
+      var id = Array.prototype.join.call(bytes.subarray(24, 40), ".") + ":" + total + ":" + block;
+      var local = stream.getUint32(4, true), key = id + ":" + chunk + ":" + local;
+      return { bytes: bytes, session: id, sequence: chunk + ":" + local, key: key };
+    }
     if (bytes.length <= 20 || bytes.length > 2953 || bytes[0] !== 0xd1 || bytes[1] !== 0x0c) return null;
     var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     var blocks = view.getUint16(8, true), length = view.getUint16(10, true);
@@ -38,7 +49,7 @@
         pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = white;
         pixels[offset + 3] = 255;
       }
-      frames.push({ sequence: (sequence + frame) >>> 0, pixels: pixels, side: side });
+      frames.push({ sequence: expectedSequence + frame, pixels: pixels, side: side });
     }
     return frames;
   }

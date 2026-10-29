@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace FileXfer
+namespace Xfer
 {
     internal sealed class AppOptions
     {
@@ -153,6 +153,8 @@ namespace FileXfer
                 {
                     auto.Cell = ParseNumber(NextValue(args, ref index, argument), argument, 1, 32);
                 }
+                else if (argument == "--color") { auto.Color = true; }
+                else if (argument == "--mono") { auto.Color = false; }
                 else if (argument == "--coarse")
                 {
                     auto.Coarse = ParseNumber(NextValue(args, ref index, argument), argument, 0, 4);
@@ -205,7 +207,7 @@ namespace FileXfer
 
             if (cli)
             {
-                throw new ArgumentException("FileXfer does not support --cli.");
+                throw new ArgumentException("Xfer does not support --cli.");
             }
             if (cli && string.IsNullOrWhiteSpace(initialPath))
             {
@@ -224,13 +226,13 @@ namespace FileXfer
 
         public static void WriteHelp(TextWriter writer)
         {
-            writer.WriteLine("FileXfer");
+            writer.WriteLine("Xfer");
             writer.WriteLine();
-            writer.WriteLine("Usage: FileXfer [options]");
+            writer.WriteLine("Usage: Xfer [options]");
             writer.WriteLine();
             writer.WriteLine("  --port <number>             Local HTTP port (default: {0})", DefaultPort);
-            writer.WriteLine("  --path <file-or-folder>     Input to show when FileXfer starts");
-            writer.WriteLine("  --mode optical             Page to show when FileXfer starts");
+            writer.WriteLine("  --path <file-or-folder>     Input to show when Xfer starts");
+            writer.WriteLine("  --mode optical             Page to show when Xfer starts");
             writer.WriteLine("  --no-browser                Run the HTTP server without the desktop window");
             writer.WriteLine("  --help                      Show this help");
             writer.WriteLine();
@@ -242,6 +244,7 @@ namespace FileXfer
             writer.WriteLine("  --qr-size <px>              Size of one QR on screen (300-1200)");
             writer.WriteLine("  --columns <n>               QRs side by side (1-3)");
             writer.WriteLine("  --rows <n>                  Rows of QRs (1-2)");
+            writer.WriteLine("  --color / --mono            Tile chroma layer on / off");
             writer.WriteLine("  --layout <qr|fx2>           QR codes, or Tile (fx2): cells over the whole window");
             writer.WriteLine("  --cell <px>                 Tile cell size in device pixels (1-32)");
             writer.WriteLine("  --coarse <n>                Tile middle tier with n times larger cells (0 = none, 2-4)");
@@ -341,6 +344,7 @@ namespace FileXfer
         public string Layout { get; set; }
         public int? Cell { get; set; }
         public int? Coarse { get; set; }
+        public bool? Color { get; set; }
         /// <summary>Percent the picture is narrowed into a trapezoid (measurement of perspective).</summary>
         public int? KeystoneX { get; set; }
         public int? KeystoneY { get; set; }

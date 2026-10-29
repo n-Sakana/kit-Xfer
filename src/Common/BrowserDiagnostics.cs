@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
-namespace FileXfer
+namespace Xfer
 {
     // Separate bounded sink: an untrusted browser cannot enqueue arbitrary objects in host logs.
     internal static class BrowserDiagnostics

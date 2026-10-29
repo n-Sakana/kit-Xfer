@@ -1,10 +1,10 @@
 {
   "id": "/",
-  "name": "FileXfer",
-  "short_name": "FileXfer",
+  "name": "Xfer",
+  "short_name": "Xfer",
   "description": "PC のファイルを QR とカメラで送る・受け取る",
   "lang": "ja",
-  "start_url": "/?v=__FileXfer_BUILD_ID__#optical",
+  "start_url": "/?v=__Xfer_BUILD_ID__#optical",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
@@ -12,7 +12,7 @@
   "theme_color": "#1c1d1f",
   "icons": [
     {
-      "src": "/icon.svg?v=__FileXfer_BUILD_ID__",
+      "src": "/icon.svg?v=__Xfer_BUILD_ID__",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

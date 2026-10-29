@@ -34,8 +34,8 @@ with socket.socket() as s:
     port = s.getsockname()[1]
 origin = f'http://127.0.0.1:{port}'
 server_log = (work / 'server-console.log').open('w')
-env = dict(os.environ, FileXfer_LOG_DIR=str(work / 'host-logs'))
-process = subprocess.Popen([shutil.which('dotnet'), str(app / 'FileXfer.dll'), '--no-browser', '--port', str(port), '--path', str(source)],
+env = dict(os.environ, Xfer_LOG_DIR=str(work / 'host-logs'))
+process = subprocess.Popen([shutil.which('dotnet'), str(app / 'Xfer.dll'), '--no-browser', '--port', str(port), '--path', str(source)],
                            cwd=work, env=env, stdout=server_log, stderr=server_log)
 
 
@@ -78,7 +78,7 @@ try:
             const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
             const view = new DataView(bytes.buffer), side = view.getUint16(4, true);
             const seq = view.getUint32(8, true), count = view.getUint16(6, true);
-            FileXferOptical.unpackFrames(bytes.buffer, side, seq, count).forEach(f => {
+            XferOptical.unpackFrames(bytes.buffer, side, seq, count).forEach(f => {
               const c = document.createElement('canvas'); c.width = c.height = side;
               c.getContext('2d').putImageData(new ImageData(f.pixels, side, side), 0, 0); images.push(c);
             });
@@ -98,7 +98,7 @@ try:
         expect(page.locator('#receiveState')).to_have_text('受け取りました', timeout=45000)
         received = Path(page.locator('#receiveOutputPath').inner_text()) / secret
         assert received.read_bytes() == original
-        success_log = page.evaluate('FileXferDiagnostics.exportJsonl()')
+        success_log = page.evaluate('XferDiagnostics.exportJsonl()')
         (work / 'browser-success.jsonl').write_text(success_log)
         print('PASS real HTTP sender -> synthetic canvas camera -> actual WASM -> HTTP relay -> C# verify/save; bytes identical', flush=True)
 
@@ -107,7 +107,7 @@ try:
         page.route('**/api/optical/receive/frames', lambda route: held.append(route))
         page.click('#readLocalCamera')
         page.wait_for_timeout(6500)
-        pending_log = page.evaluate('FileXferDiagnostics.exportJsonl()')
+        pending_log = page.evaluate('XferDiagnostics.exportJsonl()')
         assert any(r['event'] == 'page.heartbeat' and any(w['stage'] == 'http.body' and w['ageMs'] >= 1000 for w in r['data']['waiting'])
                    for r in map(json.loads, pending_log.splitlines()))
         context.set_offline(True)
@@ -118,12 +118,12 @@ try:
                 pass
         page.unroute('**/api/optical/receive/frames')
         page.wait_for_timeout(6000)
-        offline_log = page.evaluate('FileXferDiagnostics.exportJsonl()')
+        offline_log = page.evaluate('XferDiagnostics.exportJsonl()')
         (work / 'browser-offline.jsonl').write_text(offline_log)
         records = [json.loads(line) for line in offline_log.splitlines()]
         names = {r['event'] for r in records}
         assert {'relay.retry', 'camera.status', 'page.heartbeat', 'http.body.failed'} <= names
-        assert page.evaluate("new Promise(r=>{const q=indexedDB.open('FileXfer-diagnostics');q.onsuccess=()=>{const c=q.result.transaction('events').objectStore('events').count();c.onsuccess=()=>r(c.result);};})") > 0
+        assert page.evaluate("new Promise(r=>{const q=indexedDB.open('Xfer-diagnostics');q.onsuccess=()=>{const c=q.result.transaction('events').objectStore('events').count();c.onsuccess=()=>r(c.result);};})") > 0
         page.click('#readLocalCamera')
         page.wait_for_timeout(100)
         print('PASS pending HTTP age, offline relay retry and camera counters persist locally without PC connectivity', flush=True)
@@ -132,7 +132,7 @@ try:
         page.evaluate("() => {navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('PRIVATE_DENIAL_MESSAGE','NotAllowedError')};}")
         page.click('#readLocalCamera')
         expect(page.locator('#cameraLabel')).to_contain_text('許可')
-        all_log = page.evaluate('FileXferDiagnostics.exportJsonl()')
+        all_log = page.evaluate('XferDiagnostics.exportJsonl()')
         (work / 'browser-events.jsonl').write_text(all_log)
         for forbidden in [secret, session['token'], 'PRIVATE_TRANSFER_CONTENT_67d3', 'PRIVATE_DENIAL_MESSAGE', batches[0]]:
             assert forbidden not in all_log
@@ -153,20 +153,20 @@ try:
         print('PASS automatic PC collection of completion, offline interval and camera failure after reconnection', flush=True)
 
         # Test one origin-wide ring across reloads, not an unbounded record set per run.
-        page.evaluate("async()=>{for(let n=0;n<166;n++){for(let i=0;i<100;i++)FileXferDiagnostics.event('page.visibility','',{visible:true});await FileXferDiagnostics.flush();}}")
-        before = page.evaluate('FileXferDiagnostics.exportJsonl()')
+        page.evaluate("async()=>{for(let n=0;n<166;n++){for(let i=0;i<100;i++)XferDiagnostics.event('page.visibility','',{visible:true});await XferDiagnostics.flush();}}")
+        before = page.evaluate('XferDiagnostics.exportJsonl()')
         assert len(before.splitlines()) <= 16384 and 'NotAllowedError' not in before
         page.reload()
-        after = page.evaluate('FileXferDiagnostics.exportJsonl()')
+        after = page.evaluate('XferDiagnostics.exportJsonl()')
         assert 'page.visibility' in after and len(after.splitlines()) <= 16384
-        archived = page.evaluate("new Promise(r=>{const q=indexedDB.open('FileXfer-diagnostics');q.onsuccess=()=>{const c=q.result.transaction('incidents').objectStore('incidents').getAll();c.onsuccess=()=>r(c.result);};})")
+        archived = page.evaluate("new Promise(r=>{const q=indexedDB.open('Xfer-diagnostics');q.onsuccess=()=>{const c=q.result.transaction('incidents').objectStore('incidents').getAll();c.onsuccess=()=>r(c.result);};})")
         assert len(archived) <= 4096 and any(r['event'] == 'camera.open.failed' for r in archived)
         # Storage-denied mode must not break ordinary UI or grow memory indefinitely.
         denied = browser.new_context(service_workers='block')
         denied.add_init_script("Object.defineProperty(window,'indexedDB',{get(){throw new DOMException('denied','SecurityError')}})")
         denied_page = denied.new_page(); denied_page.goto(origin)
         expect(denied_page.locator('#opticalFiles .file-row')).to_have_count(1)
-        fallback = denied_page.evaluate("async()=>{for(let i=0;i<500;i++)FileXferDiagnostics.event('test.memory');return await FileXferDiagnostics.exportJsonl();}")
+        fallback = denied_page.evaluate("async()=>{for(let i=0;i<500;i++)XferDiagnostics.event('test.memory');return await XferDiagnostics.exportJsonl();}")
         assert len(fallback.splitlines()) <= 128 and 'logging.loss' in fallback
         print('PASS IndexedDB 16384-record ring, protected failure window after ring overwrite/reload, 128-record memory fallback', flush=True)
         denied.close(); browser.close()
@@ -175,7 +175,7 @@ try:
 finally:
     if process.poll() is None:
         try:
-            api('/api/shutdown', {}, headers={'X-FileXfer-Process-Id': str(process.pid)})
+            api('/api/shutdown', {}, headers={'X-Xfer-Process-Id': str(process.pid)})
             process.wait(timeout=5)
         except Exception:
             process.terminate()

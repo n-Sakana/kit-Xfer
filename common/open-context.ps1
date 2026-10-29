@@ -1,4 +1,4 @@
-﻿# common/open-context.ps1 -- reuse a running FileXfer or start it from Explorer.
+﻿# common/open-context.ps1 -- reuse a running Xfer or start it from Explorer.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
@@ -9,7 +9,7 @@ param(
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
-$script:FileXferRoot = Split-Path $PSScriptRoot -Parent
+$script:XferRoot = Split-Path $PSScriptRoot -Parent
 $script:StatusUri = "http://127.0.0.1:18422/api/status"
 $script:ActivateUri = "http://127.0.0.1:18422/api/activate"
 
@@ -28,10 +28,10 @@ function Get-HttpStatusCode {
     }
 }
 
-function Get-RunningFileXfer {
+function Get-RunningXfer {
     try {
         $status = Invoke-RestMethod -Method Get -Uri $script:StatusUri -TimeoutSec 2
-        if ($null -eq $status -or $status.application -ne "FileXfer" -or $status.device -isnot [string] -or
+        if ($null -eq $status -or $status.application -ne "Xfer" -or $status.device -isnot [string] -or
             $status.platform -isnot [string] -or $status.version -isnot [string] -or
             $null -eq $status.capabilities -or [int]$status.processId -lt 1) {
             return $null
@@ -43,7 +43,7 @@ function Get-RunningFileXfer {
     }
 }
 
-function Invoke-RunningFileXfer {
+function Invoke-RunningXfer {
     param($Status, [string]$Mode, [string]$Path)
 
     $request = @{}
@@ -57,7 +57,7 @@ function Invoke-RunningFileXfer {
             -Method Post `
             -Uri $script:ActivateUri `
             -ContentType "application/json; charset=utf-8" `
-            -Headers @{ "X-FileXfer-Process-Id" = [string]$Status.processId } `
+            -Headers @{ "X-Xfer-Process-Id" = [string]$Status.processId } `
             -Body ([Text.Encoding]::UTF8.GetBytes($body)) `
             -TimeoutSec 5
         return $null -ne $result -and [bool]$result.activated
@@ -90,12 +90,12 @@ try {
         }
     }
 
-    $running = Get-RunningFileXfer
+    $running = Get-RunningXfer
     if ($null -ne $running) {
         for ($attempt = 0; $attempt -lt 20; $attempt++) {
-            if (Invoke-RunningFileXfer $running $Mode $targetPath) {
-                # Started by the click in Explorer, this process may give the foreground to the FileXfer window;
-                # FileXfer asks for it too, but Windows refuses that to a window in the background.
+            if (Invoke-RunningXfer $running $Mode $targetPath) {
+                # Started by the click in Explorer, this process may give the foreground to the Xfer window;
+                # Xfer asks for it too, but Windows refuses that to a window in the background.
                 try {
                     Add-Type -AssemblyName Microsoft.VisualBasic
                     [Microsoft.VisualBasic.Interaction]::AppActivate([int]$running.processId)
@@ -105,20 +105,20 @@ try {
                 exit 0
             }
             Start-Sleep -Milliseconds 250
-            $latest = Get-RunningFileXfer
+            $latest = Get-RunningXfer
             if ($null -ne $latest) {
                 $running = $latest
             }
         }
-        throw "the running FileXfer desktop window could not be activated"
+        throw "the running Xfer desktop window could not be activated"
     }
 
-    $FileXferScript = Join-Path $script:FileXferRoot "FileXfer.ps1"
+    $XferScript = Join-Path $script:XferRoot "Xfer.ps1"
     if ($Mode -eq "app") {
-        & $FileXferScript
+        & $XferScript
     }
     else {
-        & $FileXferScript --path $targetPath --mode optical
+        & $XferScript --path $targetPath --mode optical
     }
     exit $LASTEXITCODE
 }
@@ -126,10 +126,10 @@ catch {
     try {
         $localData = [Environment]::GetFolderPath(
             [Environment+SpecialFolder]::LocalApplicationData)
-        $logDirectory = Join-Path $localData "FileXfer\logs"
+        $logDirectory = Join-Path $localData "Xfer\logs"
         New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
         $logPath = Join-Path $logDirectory (
-            "FileXfer_" + (Get-Date -Format "yyyyMMdd") + ".log")
+            "Xfer_" + (Get-Date -Format "yyyyMMdd") + ".log")
         $message = "[" + (Get-Date -Format "HH:mm:ss") +
             "] [ERROR] context menu: " + $_.Exception.ToString()
         [IO.File]::AppendAllText(

@@ -1,7 +1,7 @@
-"""Drive the MiniUI FileXfer window through MiniUI's stdio MCP and save screenshots.
+"""Drive the MiniUI Xfer window through MiniUI's stdio MCP and save screenshots.
 
 Windows:  python tests/ui_drive.py [--out tests/results/screens] [--visible]
-Linux:    python3 tests/ui_drive.py --linux --out tests/results/screens/linux   (runs ./FileXfer.sh)
+Linux:    python3 tests/ui_drive.py --linux --out tests/results/screens/linux   (runs ./Xfer.sh)
 Windows uses runtime/windows-x64 (or --runtime DIR) and the page in ui/. Input goes through MiniUI's own
 hit-tested click path (ui_click); nothing calls page functions directly.
 """
@@ -70,7 +70,7 @@ class Mcp:
         return result
 
     def start(self):
-        self.request("initialize", {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "filexfer-ui", "version": "1"}})
+        self.request("initialize", {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": {"name": "xfer-ui", "version": "1"}})
         self.process.stdin.write(b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n')
         self.process.stdin.flush()
         self.app = self.tool("runtime_capabilities", {})["structuredContent"]["applicationId"]
@@ -148,13 +148,13 @@ def main() -> int:
     args = parser.parse_args()
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     runtime = Path(args.runtime)
-    work = Path(tempfile.mkdtemp(prefix="filexfer-ui-"))
+    work = Path(tempfile.mkdtemp(prefix="xfer-ui-"))
     folder = sample_folder(work)
     launcher = Path(args.miniui) if args.miniui else None
     if args.linux:
-        launcher = ROOT / "FileXfer.sh"
+        launcher = ROOT / "Xfer.sh"
     if launcher is None:
-        # The test launcher and DLLs are all bundled in FileXfer.
+        # The test launcher and DLLs are all bundled in Xfer.
         miniui_cmd = ROOT / "tests" / "miniui.cmd"
         temp_runtime = work / "runtime"
         shutil.copytree(runtime, temp_runtime)
@@ -165,7 +165,7 @@ def main() -> int:
         command = [str(launcher), "--mcp", "--state-dir", str(work / "state"),
                    "--path", str(folder), "--output", str(work / "output"), "--port", args.port]
     else:
-        # MiniUI loads ui/MiniUI.App.dll (FileXfer's native component) from beside the start page.
+        # MiniUI loads ui/MiniUI.App.dll (Xfer's native component) from beside the start page.
         command = ["cmd", "/c", str(launcher), str(ROOT / "ui" / "index.html"), "--root", str(ROOT / "ui"),
                    "--state-dir", str(work / "state"), "--width", "1180", "--height", "760", "--mcp"]
         if not args.visible:

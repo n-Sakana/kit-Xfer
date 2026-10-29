@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class DiagnosticsTests
     {
@@ -17,7 +17,7 @@ namespace FileXfer
             var root = Path.GetFullPath(args[0]);
             var logs = Path.Combine(root, "logs");
             Directory.CreateDirectory(logs);
-            Environment.SetEnvironmentVariable("FileXfer_LOG_DIR", logs);
+            Environment.SetEnvironmentVariable("Xfer_LOG_DIR", logs);
             // Exercise global file-count retention before the logger opens its first part.
             for (int i = 0; i < 12; i++) File.WriteAllText(Path.Combine(logs, "trace-fixture-" + i + ".jsonl"), "");
             var input = Path.Combine(root, "input"); Directory.CreateDirectory(input);
@@ -28,7 +28,7 @@ namespace FileXfer
             var sender = new OpticalService();
             var session = sender.Start(source, new[] { Secret }, 1000, 30, "L");
             byte[] rendered; Require(sender.TryRenderPackedFrames(session.Token, 0, 1, out rendered), "real QR generation");
-            var payload = OpticalPayload.Build(source, new[] { Secret }, 2000, 64 * 1024 * 1024).Bytes;
+            var payload = OpticalPayload.Build(source, new[] { Secret }).Bytes;
             var receiver = new OpticalReceiveService(Path.Combine(root, "received"));
             receiver.Reset("test-receiver");
             receiver.AddFrame("test-receiver", new byte[] { 1, 2, 3 }, false);

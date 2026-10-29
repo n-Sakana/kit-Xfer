@@ -1,6 +1,6 @@
 using System;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>An app: image for the page: its size and its pixels as BGRA, premultiplied alpha, top-down rows.</summary>
     internal interface IAppImage
@@ -33,6 +33,23 @@ namespace FileXfer
             int factor = (width + maxWidth - 1) / maxWidth;
             int w = width / factor, h = height / factor;
             var pixels = new byte[w * h * 4];
+            // Full HD preview: average four pixels at once, keeping the blue/red sums in separate
+            // 16-bit lanes. This is the same box filter as below without the per-channel inner loops.
+            if (factor == 2)
+            {
+                var source = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(bgra.AsSpan());
+                var target = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(pixels.AsSpan());
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        int at = y * 2 * width + x * 2;
+                        uint a = source[at], b = source[at + 1], c = source[at + width], d = source[at + width + 1];
+                        uint br = (a & 0x00FF00FF) + (b & 0x00FF00FF) + (c & 0x00FF00FF) + (d & 0x00FF00FF);
+                        uint green = (a & 0x0000FF00) + (b & 0x0000FF00) + (c & 0x0000FF00) + (d & 0x0000FF00);
+                        target[y * w + x] = 0xFF000000 | ((br >> 2) & 0x00FF00FF) | ((green >> 2) & 0x0000FF00);
+                    }
+                return new NativeBitmap(w, h, pixels);
+            }
             int area = factor * factor;
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)
@@ -152,7 +169,7 @@ namespace FileXfer
     }
 }
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>An FX2 picture drawn CellPixels pixels per cell, fine tier first, the coarse middle over it. The page
     /// shows it one image pixel per device pixel, so every cell keeps the same sharp size on screen.</summary>
@@ -188,7 +205,7 @@ namespace FileXfer
                     for (int cx = 0; cx < wide; cx++)
                     {
                         int left = tier.Left + cx * s, a = Math.Max(x0, left), b = Math.Min(x1, left + s);
-                        if (b > a) row.Slice(a, b - a).Fill(cells[cy * wide + cx] != 0 ? Dark : Light);
+                        if (b > a) row.Slice(a, b - a).Fill(Fx2.Palette[cells[cy * wide + cx]]);
                     }
                     var span = row.Slice(x0, x1 - x0);
                     for (int y = y0 + 1; y < y1; y++) span.CopyTo(pixels.Slice(y * width + x0, x1 - x0));

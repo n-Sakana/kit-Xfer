@@ -28,9 +28,9 @@ def analyze(directory, plots):
             r for r in frames if r["phase"] == "measurement" and r["focus_phase"] == phase
         ]))
     for stats, selected in selections:
-        ok = [r for r in selected if r["filexfer_ok"] == "1"]
+        ok = [r for r in selected if r["xfer_ok"] == "1"]
         assert len(selected) == stats["Analyzed"]
-        assert len(ok) == stats["FileXferDecoded"]
+        assert len(ok) == stats["XferDecoded"]
         assert len({r["payload_sha256"] for r in ok}) == stats["UniqueQr"]
         assert len(ok) - stats["UniqueQr"] == stats["DuplicateQr"]
         if selected:
@@ -41,7 +41,7 @@ def analyze(directory, plots):
         bins[int(float(row["since_first_ms"]) // 1000)].append(row)
     seconds = []
     for second, group in sorted(bins.items()):
-        ok = [r for r in group if r["filexfer_ok"] == "1"]
+        ok = [r for r in group if r["xfer_ok"] == "1"]
         boundaries = [int(r["boundary_row"]) for r in group if r["boundary_row"]]
         seconds.append(dict(
             second=second, analyzed=len(group), read=len(ok), rate=len(ok) / len(group),

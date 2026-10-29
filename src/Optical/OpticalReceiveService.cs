@@ -6,11 +6,25 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace FileXfer
+namespace Xfer
 {
-    internal sealed class OpticalReceiveService
+    internal sealed class OpticalReceiveService : IDisposable
     {
+        public void Dispose()
+        {
+            lock (_gate) {
+                _disposed = true;
+                foreach (var stream in _streams.Values) stream.Dispose();
+                _streams.Clear(); _receivers.Clear(); _foreign.Clear();
+            }
+        }
+
+        private bool _disposed;
         private readonly object _gate = new object();
+        private readonly Dictionary<string, StreamingReceiver> _streams = new Dictionary<string, StreamingReceiver>(StringComparer.Ordinal);
+        private void ReleaseStream(string id)
+        { StreamingReceiver old; if (_streams.TryGetValue(id, out old)) { old.Dispose(); _streams.Remove(id); } }
+
         private readonly Dictionary<string, OpticalReceiveState> _receivers =
             new Dictionary<string, OpticalReceiveState>(StringComparer.Ordinal);
         private readonly Dictionary<string, DateTime> _stopped =
@@ -41,6 +55,7 @@ namespace FileXfer
             receiverId = RequireReceiverId(receiverId);
             lock (_gate)
             {
+                ReleaseStream(receiverId);
                 OpticalReceiveState previous;
                 _receivers.TryGetValue(receiverId, out previous);
                 Diagnostics.Event("receive.reset", Diagnostics.Id(receiverId), new { Previous = previous == null ? null : previous.TransferId });
@@ -55,6 +70,7 @@ namespace FileXfer
             receiverId = RequireReceiverId(receiverId);
             lock (_gate)
             {
+                ReleaseStream(receiverId);
                 OpticalReceiveState ended;
                 _receivers.TryGetValue(receiverId, out ended);
                 Diagnostics.Event("receive.stopped", Diagnostics.Id(receiverId), new {
@@ -82,6 +98,11 @@ namespace FileXfer
             bool openWhenDone)
         {
             receiverId = RequireReceiverId(receiverId);
+            StreamingFrame streaming;
+            if (StreamingFrame.TryParse(bytes, out streaming))
+            {
+                lock (_gate) return AddStreaming(receiverId, streaming, openWhenDone);
+            }
             OpticalFrame frame;
             if (!OpticalFrame.TryParse(bytes, out frame))
             {
@@ -91,9 +112,15 @@ namespace FileXfer
 
             lock (_gate)
             {
-                if (_stopped.ContainsKey(receiverId)) {
+                if (_disposed || _stopped.ContainsKey(receiverId)) {
                     Diagnostics.Sample("receive.reject.stopped", Diagnostics.Id(receiverId), 0, null);
                     return OpticalReceiveResult.NotRecognized();
+                }
+                StreamingReceiver stream;
+                if (_streams.TryGetValue(receiverId, out stream))
+                {
+                    if (!CanSwitch(receiverId, "legacy:" + frame.SessionId, stream.LastMatchUtc, DateTime.UtcNow)) return OpticalReceiveResult.NotRecognized();
+                    ReleaseStream(receiverId);
                 }
                 OpticalReceiveState state;
                 var expired = new List<string>();
@@ -108,7 +135,7 @@ namespace FileXfer
                 }
                 if (!_receivers.TryGetValue(receiverId, out state))
                 {
-                    if (_receivers.Count >= 16)
+                    if (_receivers.Count + _streams.Count >= 16)
                         throw new ArgumentException("受信画面が多すぎます。不要なカメラを停止してください。");
                     state = new OpticalReceiveState(frame);
                     _receivers[receiverId] = state;
@@ -202,6 +229,49 @@ namespace FileXfer
                     throw;
                 }
             }
+        }
+
+        private OpticalReceiveResult AddStreaming(string receiverId, StreamingFrame frame, bool open)
+        {
+            if (_disposed || _stopped.ContainsKey(receiverId)) return OpticalReceiveResult.NotRecognized();
+            var now = DateTime.UtcNow;
+            var expired = new List<string>();
+            foreach (var entry in _streams) if (now - entry.Value.LastSeenUtc > TimeSpan.FromMinutes(30)) expired.Add(entry.Key);
+            foreach (var id in expired) ReleaseStream(id);
+            StreamingReceiver state;
+            _streams.TryGetValue(receiverId, out state);
+            OpticalReceiveState legacy;
+            _receivers.TryGetValue(receiverId, out legacy);
+            if ((state != null && !state.Matches(frame)) || legacy != null)
+            {
+                var last = state != null ? state.LastMatchUtc : legacy.LastMatchUtc;
+                if (!CanSwitch(receiverId, frame.Id, last, now)) return OpticalReceiveResult.NotRecognized();
+                ReleaseStream(receiverId); _receivers.Remove(receiverId); state = null;
+            }
+            if (state == null)
+            {
+                if (_streams.Count + _receivers.Count >= 16) throw new ArgumentException("受信画面が多すぎます。");
+                state = new StreamingReceiver(frame, _outputRoot); _streams.Add(receiverId, state);
+                Diagnostics.Event("receive.session", state.Id, new { Receiver = Diagnostics.Id(receiverId), Streaming = true });
+            }
+            _foreign.Remove(receiverId);
+            try
+            {
+                bool completed = state.CompletedResult != null;
+                var result = state.Add(frame, _outputRoot, open);
+                if (!completed && result.Complete) Diagnostics.Event("receive.complete", state.Id, new { Files = result.FileCount, ElapsedMs = result.ElapsedSeconds * 1000 });
+                return result;
+            }
+            catch (Exception error) { Diagnostics.Failure("receive.streaming", state.Id, error); ReleaseStream(receiverId); throw; }
+        }
+
+        private bool CanSwitch(string receiverId, string key, DateTime lastMatch, DateTime now)
+        {
+            ForeignTransfer foreign;
+            if (!_foreign.TryGetValue(receiverId, out foreign) || foreign.Key != key || now - foreign.LastUtc > ForeignGap)
+            { foreign = new ForeignTransfer { Key = key, FirstUtc = now }; _foreign[receiverId] = foreign; }
+            foreign.LastUtc = now;
+            return now - lastMatch >= SwitchAfter && now - foreign.FirstUtc >= SwitchAfter;
         }
 
         /// <summary>Whether a frame of another transfer takes the receiver over: its own transfer has sent nothing
@@ -350,16 +420,16 @@ namespace FileXfer
         public OpticalReceiveResult(
             bool recognized,
             bool complete,
-            int framesCollected,
-            int duplicateFrames,
-            int sourceBlocks,
-            int solvedBlocks,
-            int totalBytes,
+            long framesCollected,
+            long duplicateFrames,
+            long sourceBlocks,
+            long solvedBlocks,
+            long totalBytes,
             double progress,
             double elapsedSeconds,
             double kilobytesPerSecond,
             string label,
-            int fileCount,
+            long fileCount,
             string outputPath,
             string openError)
         {
@@ -381,16 +451,16 @@ namespace FileXfer
 
         public bool Recognized { get; private set; }
         public bool Complete { get; private set; }
-        public int FramesCollected { get; private set; }
-        public int DuplicateFrames { get; private set; }
-        public int SourceBlocks { get; private set; }
-        public int SolvedBlocks { get; private set; }
-        public int TotalBytes { get; private set; }
+        public long FramesCollected { get; private set; }
+        public long DuplicateFrames { get; private set; }
+        public long SourceBlocks { get; private set; }
+        public long SolvedBlocks { get; private set; }
+        public long TotalBytes { get; private set; }
         public double Progress { get; private set; }
         public double ElapsedSeconds { get; private set; }
         public double KilobytesPerSecond { get; private set; }
         public string Label { get; private set; }
-        public int FileCount { get; private set; }
+        public long FileCount { get; private set; }
         public string OutputPath { get; private set; }
         public string OpenError { get; private set; }
         /// <summary>How many times the receiver moved to another transfer (the sender changed) on its way here.</summary>
@@ -422,7 +492,7 @@ namespace FileXfer
         private const int MaximumBlockLength = 2933;
         /// <summary>Blocks one transfer may have: 64 MiB in FX2's smallest frames, with room to spare.</summary>
         public const int MaximumBlocks = 1 << 20;
-        // FileXfer wraps as much as 64 MiB of file content in a DCB1 manifest and
+        // Xfer wraps as much as 64 MiB of file content in a DCB1 manifest and
         // then in the upstream DCF2 envelope. Keep the content limit at 64 MiB,
         // while allowing the protected stream to carry that bounded metadata.
         private const int MaximumPayloadLength =
@@ -585,6 +655,21 @@ namespace FileXfer
             }
         }
 
+        public void AddKnownBlock(int index, byte[] block)
+        {
+            if (index < 0 || index >= _blockCount || block.Length != _blockLength) throw new ArgumentException("Invalid known block");
+            if (_solved[index] != null) { FramesDuplicate++; return; }
+            Resolve(index, ReadWords(block));
+        }
+
+        public byte[] KnownBlock(int index)
+        {
+            var words = _solved[index]; if (words == null) return null;
+            var bytes = new byte[_blockLength];
+            for (int i = 0; i < bytes.Length; i++) bytes[i] = (byte)(words[i / 4] >> ((i % 4) * 8));
+            return bytes;
+        }
+
         public byte[] Assemble()
         {
             if (!IsComplete)
@@ -725,7 +810,7 @@ namespace FileXfer
             Diagnostics.Event("receive.verify.container.ok", transferId, new { Ms = Diagnostics.Milliseconds(stamp) });
             if (!string.Equals(mediaType, BundleMediaType, StringComparison.Ordinal))
             {
-                throw new InvalidDataException("受信した内容は FileXfer のフォルダ転送ではありません。");
+                throw new InvalidDataException("受信した内容は Xfer のフォルダ転送ではありません。");
             }
 
             Diagnostics.Event("receive.verify.bundle.start", transferId, null);
@@ -871,7 +956,7 @@ namespace FileXfer
 
             if (ReadInteger(manifest, "v", 1) != 1)
             {
-                throw new InvalidDataException("この FileXfer では扱えない転送形式です。");
+                throw new InvalidDataException("この Xfer では扱えない転送形式です。");
             }
             var label = ReadString(manifest, "label");
             if (label.IndexOf('/') >= 0)
@@ -1138,7 +1223,7 @@ namespace FileXfer
 
     internal sealed class OpticalSavedPayload
     {
-        public OpticalSavedPayload(string label, int fileCount, string outputPath)
+        public OpticalSavedPayload(string label, long fileCount, string outputPath)
         {
             Label = label;
             FileCount = fileCount;
@@ -1146,7 +1231,7 @@ namespace FileXfer
         }
 
         public string Label { get; private set; }
-        public int FileCount { get; private set; }
+        public long FileCount { get; private set; }
         public string OutputPath { get; private set; }
     }
 }

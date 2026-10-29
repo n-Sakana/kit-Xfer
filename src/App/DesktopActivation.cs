@@ -1,6 +1,6 @@
 using System;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class DesktopActivation
     {

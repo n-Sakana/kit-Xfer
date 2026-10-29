@@ -11,7 +11,7 @@ using System.Threading;
 using ZXing;
 using ZXing.Common;
 
-namespace FileXfer.Lab;
+namespace Xfer.Lab;
 
 internal static partial class CameraLab
 {
@@ -33,7 +33,7 @@ internal static partial class CameraLab
             }
             if (args[0] != "capture" && args[0] != "formats" && args[0] != "focus-hold") throw new ArgumentException("Unknown command: " + args[0]);
             var options = args[0] == "capture" ? Options.Parse(args) : null;
-            using var mutex = new Mutex(false, @"Local\FileXfer.CameraLab.Capture");
+            using var mutex = new Mutex(false, @"Local\Xfer.CameraLab.Capture");
             bool owned;
             try { owned = mutex.WaitOne(0); } catch (AbandonedMutexException) { owned = true; }
             if (!owned) throw new InvalidOperationException("Another CameraLab is using the camera.");
@@ -210,7 +210,7 @@ Ctrl+C stops and writes partial results. Exit 0=measured, 2=error,
 
     private sealed class Stats
     {
-        public int Analyzed, QrDecoded, FileXferDecoded, UniqueQr, DuplicateQr, UniqueSequences, RepeatedSequences, DecodeErrors;
+        public int Analyzed, QrDecoded, XferDecoded, UniqueQr, DuplicateQr, UniqueSequences, RepeatedSequences, DecodeErrors;
         public double DecodeMsTotal, GeometryMsTotal;
         public double? FirstValidAtMs;
         private readonly HashSet<string> hashes = new(), sequences = new();
@@ -222,7 +222,7 @@ Ctrl+C stops and writes partial results. Exit 0=measured, 2=error,
             if (m.Error != null) DecodeErrors++;
             if (m.Valid && m.ModuleX.HasValue) { moduleX.Add(m.ModuleX.Value); moduleY.Add(m.ModuleY.Value); }
             if (!m.Valid) return false;
-            FileXferDecoded++; FirstValidAtMs ??= at;
+            XferDecoded++; FirstValidAtMs ??= at;
             bool fresh = hashes.Add(m.Hash);
             if (fresh) UniqueQr++; else DuplicateQr++;
             if (sequences.Add(m.SessionKey + ":" + m.Sequence)) UniqueSequences++; else RepeatedSequences++;
@@ -230,8 +230,8 @@ Ctrl+C stops and writes partial results. Exit 0=measured, 2=error,
         }
         public object Report(double seconds) => new
         {
-            Analyzed, QrDecoded, FileXferDecoded, UniqueQr, DuplicateQr, UniqueSequences, RepeatedSequences, DecodeErrors,
-            DecodeRate = Analyzed == 0 ? (double?)null : (double)FileXferDecoded / Analyzed,
+            Analyzed, QrDecoded, XferDecoded, UniqueQr, DuplicateQr, UniqueSequences, RepeatedSequences, DecodeErrors,
+            DecodeRate = Analyzed == 0 ? (double?)null : (double)XferDecoded / Analyzed,
             QrDecodeRate = Analyzed == 0 ? (double?)null : (double)QrDecoded / Analyzed,
             UniqueQrPerSecond = seconds > 0 ? (double?) (UniqueQr / seconds) : null,
             MeanDecodeMs = Analyzed == 0 ? (double?)null : DecodeMsTotal / Analyzed,
@@ -353,7 +353,7 @@ Ctrl+C stops and writes partial results. Exit 0=measured, 2=error,
             throw new ArgumentException("Output directory must be empty: " + o.Output);
         var selected = SelectCamera(o.Camera);
         Directory.CreateDirectory(o.Output);
-        Environment.SetEnvironmentVariable("FileXfer_LOG_DIR", Path.Combine(o.Output, "trace"));
+        Environment.SetEnvironmentVariable("Xfer_LOG_DIR", Path.Combine(o.Output, "trace"));
         File.WriteAllText(Path.Combine(o.Output, "run.json"), JsonSerializer.Serialize(new
         {
             Schema = 1, StartedUtc = DateTimeOffset.UtcNow, Options = o, Camera = selected.Name,
@@ -367,7 +367,7 @@ Ctrl+C stops and writes partial results. Exit 0=measured, 2=error,
         using var captures = Writer(o.Output, "captures.csv");
         using var controlsLog = Writer(o.Output, "controls.jsonl");
         using var rowDiffs = o.RowDiffs ? Writer(o.Output, "row-differences.jsonl") : null;
-        frames.WriteLine("index,at_ms,since_first_ms,phase,interval_ms,width,height,decode_ms,geometry_ms,qr_ok,filexfer_ok,session,sequence,blocks,payload_sha256,new_qr,duplicate_qr,modules,module_x_px,module_y_px,cx,cy,mean,p5,p95,decode_error,geometry_error,focus_phase,pair_previous_index,pair_consecutive,roi_x,roi_y,roi_width,roi_height,boundary_candidate_row,boundary_row,boundary_confidence,boundary_delta,row_diff_mean,boundary_reason");
+        frames.WriteLine("index,at_ms,since_first_ms,phase,interval_ms,width,height,decode_ms,geometry_ms,qr_ok,xfer_ok,session,sequence,blocks,payload_sha256,new_qr,duplicate_qr,modules,module_x_px,module_y_px,cx,cy,mean,p5,p95,decode_error,geometry_error,focus_phase,pair_previous_index,pair_consecutive,roi_x,roi_y,roi_width,roi_height,boundary_candidate_row,boundary_row,boundary_confidence,boundary_delta,row_diff_mean,boundary_reason");
         captures.WriteLine("index,at_ms,since_first_ms,phase,interval_ms,width,height,queued,queue_depth");
         var clock = Stopwatch.StartNew();
         using var camera = new MediaFoundationCamera(selected.Id, o.Width, o.Fps, null)
@@ -513,12 +513,12 @@ Ctrl+C stops and writes partial results. Exit 0=measured, 2=error,
                 controls.AfLockAccepted, controls.LockedFocusValue, controls.AfLockAtMs, controls.AfTriggerIndex,
                 AutoMeasurement = autoFocus.Report(autoSeconds), LockedMeasurement = lockedFocus.Report(lockedSeconds) },
             Caveats = new[] { "DecodeRate denominator is analyzed frames, not all camera/sender frames.",
-                "Unique QR uses full FileXfer packet SHA256; sequence identity also includes session and payload metadata.",
+                "Unique QR uses full Xfer packet SHA256; sequence identity also includes session and payload metadata.",
                 "Module size is estimated only on decoded QR, excluding quiet zone; no geometry on misses.",
                 "Control readback confirms driver reporting, not physical exposure/focus; samples every >=500ms.",
                 "Full-frame single-worker lab decoder differs from product ROI/multi-worker receiver.",
                 "Boundary is a two-frame row-difference candidate, not proof of two distinct QR payloads; only consecutive delivered frames.",
-                "AF lock is triggered by a decoded FileXfer QR; it reads focus on the next camera callback, not at the successful exposure.",
+                "AF lock is triggered by a decoded Xfer QR; it reads focus on the next camera callback, not at the successful exposure.",
                 "Restore success is immediate driver readback only; delayed driver changes can still occur." }
         };
         File.WriteAllText(Path.Combine(o.Output, "summary.json"), JsonSerializer.Serialize(summary, new JsonSerializerOptions(Json) { WriteIndented = true }));
@@ -589,7 +589,7 @@ Ctrl+C stops and writes partial results. Exit 0=measured, 2=error,
             SessionKey = "new-session", Sequence = 1 };
         stats.Add(changed, 2);
         stats.Add(new Measurement(), 3);
-        Require(stats.UniqueQr == 2 && stats.UniqueSequences == 2 && stats.Analyzed == 6 && stats.FileXferDecoded == 5, "new QR and miss denominator");
+        Require(stats.UniqueQr == 2 && stats.UniqueSequences == 2 && stats.Analyzed == 6 && stats.XferDecoded == 5, "new QR and miss denominator");
         bytes[10] = 5;
         Require(!OpticalFrame.TryParse(bytes, out _), "invalid packet rejected");
         try { Options.Parse(new[] { "capture", "unused", "1920", "30", "5", "--bogus" }); throw new Exception("bad option accepted"); }

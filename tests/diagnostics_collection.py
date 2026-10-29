@@ -22,7 +22,7 @@ root = Path(__file__).resolve().parents[1]
 assert not stage.is_relative_to(root)
 for name in ['ui', 'web', 'lib']:
     shutil.copytree(root / name, stage / name, dirs_exist_ok=True, ignore=shutil.ignore_patterns('MiniUI.App.dll'))
-shutil.copy2(root / 'FileXfer.sh', stage / 'FileXfer.sh')
+shutil.copy2(root / 'Xfer.sh', stage / 'Xfer.sh')
 source = work / 'input'; source.mkdir(exist_ok=True)
 (source / 'test.txt').write_text('synthetic fixture')
 logs = work / 'logs'
@@ -44,8 +44,8 @@ try:
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
     origin = f'http://127.0.0.1:{port}'
-    env = dict(os.environ, DISPLAY=display, FileXfer_LOG_DIR=str(logs))
-    process = subprocess.Popen(['bash', str(stage / 'FileXfer.sh'), '--path', str(source), '--port', str(port),
+    env = dict(os.environ, DISPLAY=display, Xfer_LOG_DIR=str(logs))
+    process = subprocess.Popen(['bash', str(stage / 'Xfer.sh'), '--path', str(source), '--port', str(port),
         '--output', str(work / 'received'), '--state-dir', str(work / 'state'), '--duration-ms', '110000'],
         env=env, cwd=work, stdout=console, stderr=console)
     for _ in range(100):
@@ -70,7 +70,7 @@ try:
             if any(r['event'] == 'page.start' for r in browser_records()): break
             page.wait_for_timeout(500)
         else: raise AssertionError('ordinary page startup was not automatically collected')
-        print('PASS ordinary FileXfer.sh -> real MiniUI -> local server -> automatic browser JSONL on PC, no diagnostic console command', flush=True)
+        print('PASS ordinary Xfer.sh -> real MiniUI -> local server -> automatic browser JSONL on PC, no diagnostic console command', flush=True)
 
         # Exercise a real worker WASM initialization failure without touching a camera.
         context.route('**/*.wasm', lambda route: route.fulfill(status=503, body='PRIVATE_WASM_RESPONSE'))
@@ -106,7 +106,7 @@ try:
             try:
                 with urllib.request.urlopen(request) as r: return r.status
             except urllib.error.HTTPError as error: return error.code
-        headers = {'Content-Type': 'application/json', 'X-FileXfer-Diagnostics': '1', 'Origin': origin}
+        headers = {'Content-Type': 'application/json', 'X-Xfer-Diagnostics': '1', 'Origin': origin}
         assert post(b'{}', dict(headers, Origin='https://invalid.example')) == 403
         assert post(b'x' * 65537, headers) == 400
         forged = dict(browser_records()[0]); forged['data'] = {'type': 'PRIVATE_ERROR_TEXT', 'file': 'PRIVATE_FILE', 'site': 'PRIVATE_PATH'}

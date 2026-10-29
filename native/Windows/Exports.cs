@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>The C ABI MiniUI's Windows host loads (docs/native-component.md in miniUI): miniui_call for JSON
     /// requests and miniui_image for app: images. Both run on the window's UI thread.</summary>
@@ -11,7 +11,7 @@ namespace FileXfer
     {
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, false);
 
-        [UnmanagedCallersOnly(EntryPoint = "filexfer_shutdown", CallConvs = new[] { typeof(CallConvCdecl) })]
+        [UnmanagedCallersOnly(EntryPoint = "xfer_shutdown", CallConvs = new[] { typeof(CallConvCdecl) })]
         public static int Shutdown(int timeoutMilliseconds)
         {
             try { return NativeShutdown.Finish(timeoutMilliseconds); }

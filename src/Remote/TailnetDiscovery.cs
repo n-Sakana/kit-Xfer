@@ -6,7 +6,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FileXfer
+namespace Xfer
 {
     internal sealed class TailnetDiscovery
     {
@@ -140,7 +140,7 @@ namespace FileXfer
                 }
                 catch (AggregateException)
                 {
-                    // A peer that is online need not be running FileXfer.
+                    // A peer that is online need not be running Xfer.
                 }
                 foreach (var task in tasks)
                 {

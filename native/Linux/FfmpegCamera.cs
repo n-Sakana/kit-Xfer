@@ -5,7 +5,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>A V4L2 camera read through ffmpeg: raw BGRA frames on its standard output, one new buffer per frame.</summary>
     internal sealed class FfmpegCamera : ICameraSource, IFocusHold
@@ -60,9 +60,9 @@ namespace FileXfer
             try { _process = Process.Start(info); }
             catch (Exception error) { Diagnostics.Failure("camera.ffmpeg.start", "native", error); throw new InvalidOperationException("ffmpeg を起動できません。ffmpeg が入っているか確かめてください。"); }
             _clock.Start();
-            _errors = new Thread(ReadErrors) { IsBackground = true, Name = "FileXfer camera errors" };
+            _errors = new Thread(ReadErrors) { IsBackground = true, Name = "Xfer camera errors" };
             _errors.Start();
-            _reader = new Thread(() => ReadFrames(frame)) { IsBackground = true, Name = "FileXfer camera" };
+            _reader = new Thread(() => ReadFrames(frame)) { IsBackground = true, Name = "Xfer camera" };
             _reader.Start();
         }
 

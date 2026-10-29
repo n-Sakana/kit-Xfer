@@ -1,5 +1,5 @@
 // Backend regression suite. No NuGet test runner required.
-// dotnet run --project tests/FileXfer.Regression.csproj -c Release
+// dotnet run --project tests/Xfer.Regression.csproj -c Release
 // Keep C# 5 syntax so the source also compiles with Windows PowerShell 5.1.
 using System;
 using System.Collections.Generic;
@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class RegressionTests
     {
@@ -20,14 +20,14 @@ namespace FileXfer
 
         public static int Main()
         {
-            _root = Path.Combine(Path.Combine(Directory.GetCurrentDirectory(), "artifacts"), "FileXfer-regression-" + Guid.NewGuid().ToString("N"));
+            _root = Path.Combine(Path.Combine(Directory.GetCurrentDirectory(), "artifacts"), "Xfer-regression-" + Guid.NewGuid().ToString("N"));
             try
             {
                 var input = Path.Combine(_root, "input");
                 Directory.CreateDirectory(input);
                 _sample = new byte[24000]; new Random(1776).NextBytes(_sample);
                 File.WriteAllBytes(Path.Combine(input, "sample.bin"), _sample);
-                File.WriteAllText(Path.Combine(input, "note.txt"), "FileXfer regression 日本語\n");
+                File.WriteAllText(Path.Combine(input, "note.txt"), "Xfer regression 日本語\n");
                 _source = FolderCatalog.Inspect(input);
                 Run("CLI argument validation", TestOptions);
                 Run("Fountain loss, reorder and duplicates", TestFountain);
@@ -57,7 +57,7 @@ namespace FileXfer
             throw new Exception("Expected " + typeof(T).Name);
         }
         private static IList<string> Names() { return new[] { "sample.bin", "note.txt" }; }
-        private static OpticalPayload Payload() { return OpticalPayload.Build(_source, Names(), 2000, 64 * 1024 * 1024); }
+        private static OpticalPayload Payload() { return OpticalPayload.Build(_source, Names()); }
         private static OpticalStartResult Start(OpticalService service)
         { return service.Start(_source, Names(), 1000, 30, "L"); }
         private static void TestOptions()
@@ -223,11 +223,11 @@ namespace FileXfer
             // ArgumentException. Duplicates are folded by the seen set rather than rejected.
             // Verified on Windows 2026-09-08: "../outside.bin", an absolute path and a deep
             // "../../.." traversal are all rejected this way.
-            Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { "../outside.bin" }, 2000, 64 * 1024 * 1024); });
-            Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { Path.Combine(_root, "outside.bin") }, 2000, 64 * 1024 * 1024); });
-            Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { "../../../../../../Windows/win.ini" }, 2000, 64 * 1024 * 1024); });
-            Require(OpticalPayload.Build(_source, new[] { "sample.bin", "sample.bin" }, 2000, 64 * 1024 * 1024)
-                .Bytes.Length == OpticalPayload.Build(_source, new[] { "sample.bin" }, 2000, 64 * 1024 * 1024).Bytes.Length,
+            Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { "../outside.bin" }); });
+            Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { Path.Combine(_root, "outside.bin") }); });
+            Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { "../../../../../../Windows/win.ini" }); });
+            Require(OpticalPayload.Build(_source, new[] { "sample.bin", "sample.bin" })
+                .Bytes.Length == OpticalPayload.Build(_source, new[] { "sample.bin" }).Bytes.Length,
                 "duplicate selection was not folded");
         }
         private static void TestOutputDirectories()

@@ -8,8 +8,8 @@ CameraLab 同士は名前付き mutex で同時実行を拒否するが、他の
 ## ビルドと起動（PowerShell、repo 直下）
 
 ```powershell
-dotnet build tests/FileXfer.CameraLab.csproj -c Release --artifacts-path tests/results/cameralab-build-v2
-$cameraLab = "tests/results/cameralab-build-v2/bin/FileXfer.CameraLab/release/FileXfer.CameraLab.dll"
+dotnet build tests/Xfer.CameraLab.csproj -c Release --artifacts-path tests/results/cameralab-build-v2
+$cameraLab = "tests/results/cameralab-build-v2/bin/Xfer.CameraLab/release/Xfer.CameraLab.dll"
 dotnet $cameraLab selftest
 dotnet $cameraLab --help
 dotnet $cameraLab list
@@ -66,7 +66,7 @@ SECONDS はウォームアップ後の測定時間。起動にかかった時間
 | `--save-every N` | 元の取得indexがNの倍数である解析画像を保存。既定0＝無効 |
 | `--probe` | 設定読戻しをコンソールにも表示。ファイルには指定なしでも記録 |
 | `--no-restore` | 終了時の元設定への復元を省略。通常は指定しない |
-| `--roi X,Y,W,H` | 行差分に使う固定QR領域。指定なしなら最初に読めたFileXfer QRの領域を固定 |
+| `--roi X,Y,W,H` | 行差分に使う固定QR領域。指定なしなら最初に読めたXfer QRの領域を固定 |
 | `--row-diffs` | 境目候補に加え、各行の差分量をJSONL保存 |
 | `--af-lock-after S` | 後述のAF固定試験を有効化し、最初のフレームからS秒以降の読取成功を待つ |
 | `--af-lock-settle S` | 固定直後に前後比較から除く秒数。既定0.5 |
@@ -89,7 +89,7 @@ SECONDS はウォームアップ後の測定時間。起動にかかった時間
 dotnet $cameraLab capture tests/results/c920-af-lock-01 1920 30 20 C920 --height 1080 --warmup 2 --exposure auto --gain keep --af-lock-after 5 --af-lock-settle 0.5 --row-diffs
 ```
 
-この例はfocusを自動にして撮影し、最初のフレームから5秒以降にFileXfer QRが読めたら、
+この例はfocusを自動にして撮影し、最初のフレームから5秒以降にXfer QRが読めたら、
 次のカメラ処理で現在のfocusを読み、**その値**をmanualで設定する。
 読取成功はAFが最良の焦点に到達した保証ではなく、固定のきっかけとして使用する。
 成功画像の撮影時と設定時には遅れがあるので、controls.jsonl の `af_lock` に
@@ -115,7 +115,7 @@ frames.csv の `focus_phase` は `auto / lock_transition / lock_settling / locke
 | `frame-*.pgm` / `miss-*.pgm` | 解析に使った8bitグレー画像。ファイル名の番号は取得index |
 | `trace/` | 製品側の診断機構が出力するカメラ等の診断ログ |
 
-読取率 `DecodeRate` は「FileXferのパケットとして検証できた枚数 / 解析した枚数」。
+読取率 `DecodeRate` は「Xferのパケットとして検証できた枚数 / 解析した枚数」。
 送信QR全数に対する受信率ではない。`QrDecodeRate` は他のQRも含むZXing成功率。
 `DroppedBeforeDecode` と `MeasuredDropped` があれば、解析されなかった画像が存在する。
 解像度・fpsの指定値とは別に `NegotiatedFps` と実際のコールバック間隔から求める `DeliveredFps` を残す。
@@ -127,7 +127,7 @@ frames.csv の `new_qr / duplicate_qr` は実行全体での初出判定。
 
 `module_x_px / module_y_px` は読めたQRのファインダ中心間距離を `(一辺マス数−7)` で割った推定値。
 autoでは二値画像からQR次元を検出する。余白をマス数に含めない。
-斜め撮影のため縦横を別記し、読めない画像は空欄。summaryの中央値はFileXfer QRだけから計算する。
+斜め撮影のため縦横を別記し、読めない画像は空欄。summaryの中央値はXfer QRだけから計算する。
 `decode_ms` と、次元検出等の `geometry_ms` は別々。行差分・ファイル保存時間はこれらに含めない。
 明るさは画像全体を97画素間隔で標本化したmean/p5/p95。
 
@@ -214,7 +214,7 @@ python tests/camera_lab_report.py --plots tests/results/cameralab-20261021-0117/
 OUTは空のフォルダを指定します。開始時はAFが有効である必要があります。
 
 ```powershell
-dotnet <ビルド先>/FileXfer.CameraLab.dll focus-hold tests/results/focus-probe C920
+dotnet <ビルド先>/Xfer.CameraLab.dll focus-hold tests/results/focus-probe C920
 ```
 
 現在値の手動固定、固定の維持、AF解除、元から手動の場合の無変更、終了時のAF復帰を確認します。

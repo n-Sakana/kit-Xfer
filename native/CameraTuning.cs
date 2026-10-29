@@ -1,6 +1,6 @@
 using System;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>How the camera is set for reading a screen. A screen switches its QR between two pictures, so a short
     /// exposure keeps that switch out of most pictures; a fixed focus keeps the autofocus from hunting on a pattern

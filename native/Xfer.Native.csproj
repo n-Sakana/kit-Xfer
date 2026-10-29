@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- FileXfer's native component for the MiniUI Windows host: a Native AOT DLL exporting miniui_call and
-       miniui_image. It runs FileXfer's local server, optical send/receive, camera and file dialogs. -->
+  <!-- Xfer's native component for the MiniUI Windows host: a Native AOT DLL exporting miniui_call and
+       miniui_image. It runs Xfer's local server, optical send/receive, camera and file dialogs. -->
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <AssemblyName>FileXfer.Native</AssemblyName>
-    <RootNamespace>FileXfer</RootNamespace>
+    <AssemblyName>Xfer.Native</AssemblyName>
+    <RootNamespace>Xfer</RootNamespace>
     <OutputType>Library</OutputType>
     <PublishAot>true</PublishAot>
     <NativeLib>Shared</NativeLib>
@@ -16,11 +16,11 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <InvariantGlobalization>true</InvariantGlobalization>
     <UseSystemResourceKeys>false</UseSystemResourceKeys>
-    <OptimizationPreference>Size</OptimizationPreference>
+    <OptimizationPreference>Speed</OptimizationPreference>
     <StripSymbols>true</StripSymbols>
     <DebugType>none</DebugType>
     <!-- Keep compiler-generated source locations independent of the build machine. -->
-    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))=/_/FileXfer</PathMap>
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))=/_/Xfer</PathMap>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -28,6 +28,6 @@
     <Compile Include="*.cs;Windows/*.cs" />
     <Reference Include="zxing"><HintPath>../lib/zxing.dll</HintPath></Reference>
     <!-- JsonCodec serialises result objects by reflection: keep this assembly's metadata. -->
-    <TrimmerRootAssembly Include="FileXfer.Native" />
+    <TrimmerRootAssembly Include="Xfer.Native" />
   </ItemGroup>
 </Project>

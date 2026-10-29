@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>FX2 pictures of one display session, made ahead on a background thread (fountain frames,
     /// Reed-Solomon, cells) so the page can show a new picture every display tick. The page names the picture by
@@ -13,22 +13,24 @@ namespace FileXfer
         private const int Ahead = 3;
         private readonly OpticalService _service;
         private readonly Fx2Code _code;
+        private readonly bool _color;
         private readonly object _gate = new object();
-        private readonly Dictionary<uint, Fx2Picture> _ready = new Dictionary<uint, Fx2Picture>();
+        private readonly Dictionary<ulong, Fx2Picture> _ready = new Dictionary<ulong, Fx2Picture>();
         private readonly Thread _worker;
         private Fx2Layout _layout;
-        private uint _wanted;
+        private ulong _wanted;
         private bool _stopped;
         private string _error;
 
         public readonly string Token;
         public readonly string TransferId;
 
-        public Fx2Stream(OpticalService service, string token, string errorCorrection)
+        public Fx2Stream(OpticalService service, string token, string errorCorrection, bool color = false)
         {
+            _color = color;
             _service = service; Token = token; TransferId = service.DiagnosticTransfer(token);
             _code = Fx2Code.ForLevel(Fx2Code.ParseLevel(errorCorrection));
-            _worker = new Thread(Run) { IsBackground = true, Name = "FileXfer FX2 pictures", Priority = ThreadPriority.AboveNormal };
+            _worker = new Thread(Run) { IsBackground = true, Name = "Xfer FX2 pictures", Priority = ThreadPriority.AboveNormal };
             _worker.Start();
         }
 
@@ -53,7 +55,7 @@ namespace FileXfer
         }
 
         /// <summary>The picture whose first patch carries this sequence number.</summary>
-        public Fx2Picture Picture(uint sequence, Fx2Layout layout)
+        public Fx2Picture Picture(ulong sequence, Fx2Layout layout)
         {
             var stamp = Diagnostics.Stamp();
             Fx2Picture picture;
@@ -61,7 +63,7 @@ namespace FileXfer
             {
                 if (layout != _layout) throw new InvalidOperationException("Tile layout changed");
                 _wanted = sequence;
-                foreach (var old in new List<uint>(_ready.Keys)) if (unchecked(old - sequence) > (uint)(Ahead * layout.Patches)) _ready.Remove(old);
+                foreach (var old in new List<ulong>(_ready.Keys)) if (unchecked(old - sequence) > (ulong)(Ahead * layout.Patches)) _ready.Remove(old);
                 _ready.TryGetValue(sequence, out picture);
                 Monitor.PulseAll(_gate);
             }
@@ -75,15 +77,15 @@ namespace FileXfer
             return picture;
         }
 
-        private Fx2Picture Render(uint sequence, Fx2Layout layout)
+        private Fx2Picture Render(ulong sequence, Fx2Layout layout)
         {
             var stamp = Diagnostics.Stamp();
-            var picture = new Fx2Picture(layout, _code, sequence, delegate(uint s)
+            var picture = new Fx2Picture(layout, _code, sequence, delegate(ulong s)
             {
                 byte[] frame;
                 if (!_service.TryFrame(Token, s, out frame)) throw new InvalidOperationException("QR の表示は終了しました。");
                 return frame;
-            });
+            }, _color);
             Diagnostics.Sample("send.fx2_picture", TransferId, Diagnostics.Milliseconds(stamp), new { Sequence = sequence, Patches = layout.Patches });
             return picture;
         }
@@ -92,7 +94,7 @@ namespace FileXfer
         {
             while (true)
             {
-                uint next; Fx2Layout layout;
+                ulong next; Fx2Layout layout;
                 lock (_gate)
                 {
                     while (!_stopped && !NeedsWork(out next)) Monitor.Wait(_gate, 200);
@@ -103,7 +105,7 @@ namespace FileXfer
                 try
                 {
                     var picture = Render(next, layout);
-                    lock (_gate) { if (layout == _layout && unchecked(next - _wanted) <= (uint)(Ahead * layout.Patches)) _ready[next] = picture; }
+                    lock (_gate) { if (layout == _layout && unchecked(next - _wanted) <= (ulong)(Ahead * layout.Patches)) _ready[next] = picture; }
                 }
                 catch (Exception error)
                 {
@@ -114,13 +116,13 @@ namespace FileXfer
             }
         }
 
-        private bool NeedsWork(out uint next)
+        private bool NeedsWork(out ulong next)
         {
             next = 0;
             if (_layout == null) return false;
-            for (uint i = 1; i <= Ahead; i++)
+            for (ulong i = 1; i <= Ahead; i++)
             {
-                next = unchecked(_wanted + i * (uint)_layout.Patches);
+                next = unchecked(_wanted + i * (ulong)_layout.Patches);
                 if (!_ready.ContainsKey(next)) return true;
             }
             return false;

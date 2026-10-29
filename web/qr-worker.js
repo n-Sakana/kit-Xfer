@@ -1,4 +1,4 @@
-/* FileXfer camera decoder. The bundled ZXing-WASM 2.2.4 reader is unchanged. */
+/* Xfer camera decoder. The bundled ZXing-WASM 2.2.4 reader is unchanged. */
 "use strict";
 
 var readerReady = false;
@@ -77,9 +77,9 @@ self.onmessage = async function (event) {
 (async function initialize() {
   try {
     diagnosticStage = "worker.import";
-    importScripts("/optical-core.js?v=__FileXfer_BUILD_ID__", "/zxing-reader.js?v=__FileXfer_BUILD_ID__");
-    core = self.FileXferOptical;
-    readBarcodes = self.FileXferZXingRead;
+    importScripts("/optical-core.js?v=__Xfer_BUILD_ID__", "/zxing-reader.js?v=__Xfer_BUILD_ID__");
+    core = self.XferOptical;
+    readBarcodes = self.XferZXingRead;
     diagnosticStage = "worker.wasm_initialize";
     await readBarcodes(new ImageData(8, 8), { formats: ["QRCode"] });
     readerReady = true;

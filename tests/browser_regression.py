@@ -68,7 +68,7 @@ def scene(qr: Image.Image, name: str) -> Image.Image:
         return Image.fromarray(cv2.warpPerspective(np.array(code),cv2.getPerspectiveTransform(src,dst),(width,height),borderValue=(190,190,190)))
     if name == 'multiple_qr':
         x,y=800,470
-        pairing,_,_=qr_image(b'https://FileXfer.example.test:10000/')
+        pairing,_,_=qr_image(b'https://Xfer.example.test:10000/')
         pairing=pairing.resize((310,310),Image.Resampling.NEAREST)
         image.paste(pairing,(20,20))
     image.paste(code,(x,y))
@@ -117,7 +117,7 @@ class Handler(BaseHTTPRequestHandler):
         else: p=ROOT/'web'/('index.html' if path=='/' else path.lstrip('/'))
         if not p.is_file(): self.send_content(b'{"error":"not found"}',status=404);return
         types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.wasm':'application/wasm','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'}
-        self.send_content(p.read_bytes().replace(b'__FileXfer_BUILD_ID__',b'regression') if p.suffix in ['.html','.js','.css'] else p.read_bytes(),types.get(p.suffix,'application/octet-stream'))
+        self.send_content(p.read_bytes().replace(b'__Xfer_BUILD_ID__',b'regression') if p.suffix in ['.html','.js','.css'] else p.read_bytes(),types.get(p.suffix,'application/octet-stream'))
 
 
 server=None
@@ -269,7 +269,7 @@ with sync_playwright() as pw:
         decoded=page.evaluate('p=>decodeImage(...p)',['new',f'/generated/{name}.png',99,None])
         assert decoded['bytes'] is None
     passed('blank and non-transfer QR never enter receive upload')
-    matching_session=page.evaluate('b64=>FileXferOptical.parseFrame(Uint8Array.from(atob(b64),c=>c.charCodeAt(0))).session',frames['balanced'])
+    matching_session=page.evaluate('b64=>XferOptical.parseFrame(Uint8Array.from(atob(b64),c=>c.charCodeAt(0))).session',frames['balanced'])
     decoded=page.evaluate('p=>decodeImage(...p)',['new','/generated/balanced_center.png',99,None,matching_session])
     assert decoded['bytes']==frames['balanced']
     decoded=page.evaluate('p=>decodeImage(...p)',['new','/generated/balanced_center.png',99,None,'different-session'])
@@ -278,7 +278,7 @@ with sync_playwright() as pw:
     # Same data, same image: compare the old full-frame path with new tracked ROI path.
     first=page.evaluate('p=>decodeImage(...p)',['new','/generated/balanced_off_center.png',100,None])
     assert first['bytes']==frames['balanced']
-    crop=page.evaluate('position=>{const c=FileXferOptical;const t=c.trackPosition(position,{x:0,y:0},1280,960,1000);return c.scanRegion(1280,960,t,1,1001);}',first['position'])
+    crop=page.evaluate('position=>{const c=XferOptical;const t=c.trackPosition(position,{x:0,y:0},1280,960,1000);return c.scanRegion(1280,960,t,1,1001);}',first['position'])
     assert not crop['full']
     times={'old_full':[],'new_roi':[]}
     for n in range(18):
@@ -344,7 +344,7 @@ with sync_playwright() as pw:
     ui.wait_for_function("document.getElementById('showQr').disabled===false")
     assert ui.locator('#frameAmount').input_value()=='1000'
     assert ui.locator('#frameRate').input_value()=='30'
-    assert ui.title() == 'FileXfer'
+    assert ui.title() == 'Xfer'
     assert ui.locator('[data-page-panel]').count() == 1
     passed('initial optical screen and default settings')
     ui.select_option('#frameAmount','2953');ui.select_option('#errorCorrection','H')

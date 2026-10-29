@@ -7,7 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>FX2 bench without a camera. selftest: codes and layouts. sim: a synthetic camera (perspective, lens
     /// distortion, blur, noise, exposure across display switches with both rolling shutters, partial view) reads a
@@ -108,6 +108,34 @@ namespace FileXfer
                 code.Encode(frame, cells);
                 byte[] back; int corrected;
                 Check(ref failures, code.TryDecode(cells, out back, out corrected) && back.SequenceEqual(frame) && corrected == 0, "patch round trip " + level);
+                // The table encoder must keep the existing optical wire format, including both interleaved
+                // codewords of unequal length. Compare randomized payloads against ZXing's polynomial encoder.
+                bool identical = true;
+                var reference = new ZXing.Common.ReedSolomon.ReedSolomonEncoder(ZXing.Common.ReedSolomon.GenericGF.QR_CODE_FIELD_256);
+                for (int trial = 0; trial < 100; trial++)
+                {
+                    var input = new byte[code.FrameBytes]; random.NextBytes(input);
+                    var encoded = new byte[Fx2.DataCells.Length]; code.Encode(input, encoded);
+                    var patch = new byte[Fx2.PatchBytes]; Buffer.BlockCopy(input, 0, patch, 0, input.Length);
+                    uint crc = Fx2.Crc32(input, 0, input.Length);
+                    for (int b = 0; b < 4; b++) patch[input.Length + b] = (byte)(crc >> (24 - b * 8));
+                    for (int k = 0; k < Fx2Code.Codewords; k++)
+                    {
+                        int length = (Fx2.PatchBytes - k + Fx2Code.Codewords - 1) / Fx2Code.Codewords;
+                        var word = new int[length];
+                        for (int i = 0; i < length - code.Parity; i++) word[i] = patch[i * Fx2Code.Codewords + k];
+                        reference.encode(word, code.Parity);
+                        for (int i = length - code.Parity; i < length; i++) patch[i * Fx2Code.Codewords + k] = (byte)word[i];
+                    }
+                    for (int bit = 0; bit < encoded.Length; bit++)
+                    {
+                        int index = bit >> 3, value = (index < patch.Length ? patch[index] : 0) ^ Fx2.Whiten(index);
+                        if (encoded[bit] != ((value >> (7 - (bit & 7))) & 1)) identical = false;
+                    }
+                }
+                Check(ref failures, identical, "reference parity, 100 payloads, level " + level);
+                var badCrc = (byte[])cells.Clone(); badCrc[code.FrameBytes * 8] ^= 1;
+                Check(ref failures, code.TryDecode(badCrc, out back, out corrected) && back.SequenceEqual(frame) && corrected > 0, "CRC damage takes correction path " + level);
                 // Wrong bytes: the codeword with the most damage decides.
                 var damaged = (byte[])cells.Clone();
                 int wrong = code.Parity / 2 * Fx2Code.Codewords - 2;
@@ -128,6 +156,17 @@ namespace FileXfer
                 var reader = new Fx2Reader();
                 var result = reader.Read(picture.Render(), layout.Width, layout.Height);
                 Check(ref failures, result.Frames.Count == layout.Patches, "clean picture " + result.Frames.Count + "/" + layout.Patches + " patches, " + result.Markers.Count + " markers, " + result.Ms.ToString("0.0") + " ms");
+                var changed = new Fx2Picture(layout, Fx2Code.ForLevel(1), 0, s => {
+                    var bytes = new byte[Fx2Code.ForLevel(1).FrameBytes]; bytes[bytes.Length - 1] = 123; return bytes;
+                }).Render();
+                var tracked = reader.Read(changed, layout.Width, layout.Height);
+                Check(ref failures, tracked.Tracked && tracked.Frames.Count == layout.Patches && tracked.Frames.All(f => f[f.Length - 1] == 123), "tracked geometry reads fresh payloads");
+                var moved = Enumerable.Repeat((byte)255, changed.Length).ToArray();
+                for (int y = 0; y < layout.Height; y++) Buffer.BlockCopy(changed, y * layout.Width, moved, y * layout.Width + 17, layout.Width - 17);
+                var reacquired = reader.Read(moved, layout.Width, layout.Height);
+                Check(ref failures, !reacquired.Tracked && reacquired.Frames.Count > 0 && reacquired.Frames.All(f => f[f.Length - 1] == 123), "movement reacquires geometry");
+                var blank = reader.Read(Enumerable.Repeat((byte)255, changed.Length).ToArray(), layout.Width, layout.Height);
+                Check(ref failures, !blank.Tracked && blank.Frames.Count == 0, "removed screen never replays tracked data");
             }
             // A QR code is not FX2: its finder and alignment patterns may read as markers, but no patch forms.
             {
@@ -329,7 +368,7 @@ namespace FileXfer
                     if (!pictures.TryGetValue(f, out p))
                     {
                         if (pictures.Count > 8) pictures.Remove(pictures.Keys.Min());
-                        p = pictures[f] = new Fx2Picture(layout, code, (uint)(f * layout.Patches), s => source.Frame(s)).Render();
+                        p = pictures[f] = new Fx2Picture(layout, code, (uint)(f * layout.Patches), s => source.Frame(unchecked((uint)s))).Render();
                     }
                 }
                 return p;
@@ -427,7 +466,7 @@ namespace FileXfer
             var layout = Fx2Layout.Create(screen[0], screen[1], o.Int("cell", 3), o.Int("coarse", 0));
             var code = Fx2Code.ForLevel(Fx2Code.ParseLevel(o.Text("level", "M")));
             var source = new FrameSource(o.Int("bytes", 200000), code.FrameBytes, 7);
-            var picture = new Fx2Picture(layout, code, 0, s => source.Frame(s));
+            var picture = new Fx2Picture(layout, code, 0, s => source.Frame(unchecked((uint)s)));
             WritePgm(o.Positional[0], picture.Render(), layout.Width, layout.Height);
             Console.WriteLine(layout.Width + "x" + layout.Height + ", " + layout.Patches + " patches");
             return 0;

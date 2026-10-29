@@ -2,16 +2,16 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace FileXfer.Launcher
+namespace Xfer.Launcher
 {
     public static class NativeShutdown
     {
-        // Use only the already loaded FileXfer DLL. Never load a new native runtime at shutdown.
+        // Use only the already loaded Xfer DLL. Never load a new native runtime at shutdown.
         public static int Finish(string componentPath, int timeoutMilliseconds)
         {
             IntPtr module = GetModuleHandleW(Path.GetFullPath(componentPath));
             if (module == IntPtr.Zero) return -1;
-            IntPtr entry = GetProcAddress(module, "filexfer_shutdown");
+            IntPtr entry = GetProcAddress(module, "xfer_shutdown");
             if (entry == IntPtr.Zero) return -2;
             var finish = (FinishCallback)Marshal.GetDelegateForFunctionPointer(entry, typeof(FinishCallback));
             return finish(Math.Max(0, Math.Min(2000, timeoutMilliseconds)));

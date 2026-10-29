@@ -1,17 +1,17 @@
 using System;
 using System.IO;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class Probe
     {
         private static void Main()
         {
-            string root = Path.Combine(Path.GetTempPath(), "FileXfer-probe-" + Guid.NewGuid().ToString("N"));
+            string root = Path.Combine(Path.GetTempPath(), "Xfer-probe-" + Guid.NewGuid().ToString("N"));
             string source = Path.Combine(root, "src");
             Directory.CreateDirectory(source);
             File.WriteAllText(Path.Combine(source, "sample.bin"), "hello");
-            File.WriteAllText(Path.Combine(source, "note.txt"), "FileXfer regression");
+            File.WriteAllText(Path.Combine(source, "note.txt"), "Xfer regression");
             File.WriteAllText(Path.Combine(root, "outside.bin"), "SECRET OUTSIDE");
             var snap = FolderCatalog.Inspect(source);
 
@@ -25,7 +25,7 @@ namespace FileXfer
         {
             try
             {
-                var payload = OpticalPayload.Build(snap, names, 2000, 64 * 1024 * 1024);
+                var payload = OpticalPayload.Build(snap, names);
                 Console.WriteLine("!! 通った        " + label + "  bytes=" + payload.Bytes.Length);
             }
             catch (Exception e)

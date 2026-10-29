@@ -1,5 +1,5 @@
-a2a2d0729d56741a183d89c272271aec27f580a65b3156fa0b8c3edb17b648b2  runtime/linux-x64/MiniUI.Core.dll
-b2c8b175487d36793e148f40a1657f6f821f2e39c10c4520b04c1d6ccfd60d4f  runtime/linux-x64/MiniUI.Platform.Linux.dll
+9d812467b41b0a2c18be98620e07fbf8688e23277a02100e7e43eb64a83ad702  runtime/linux-x64/MiniUI.Core.dll
+c8feeb7a9e98df0bf663972eaed273be4adada55c1712ff29b25937ae149ca5b  runtime/linux-x64/MiniUI.Platform.Linux.dll
 67dbe12bb47cf6f95513a9450e558e6a9ca82e52b270ab2879524b3be94e290e  runtime/windows-x64/MiniUI.Bridge.dll
 4141acc90d1a441164d523d119d1ceaddccd63bf8c00f36188016924b0786147  runtime/windows-x64/MiniUI.Engine.dll
 b967c8e0c8fc0b076e2181924d9cda0b74250f4f211587c922cbce6fc1cc6480  tests/miniui.cmd

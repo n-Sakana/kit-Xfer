@@ -1,6 +1,6 @@
 using System;
 
-namespace FileXfer
+namespace Xfer
 {
     /// <summary>Owns only the temporary change from autofocus to manual focus. The supplied gate also protects
     /// the device's control handle, so a decoder cannot change focus while the camera is being released.</summary>

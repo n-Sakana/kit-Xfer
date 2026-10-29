@@ -2,7 +2,7 @@
   <!-- Precompiled P/Invoke bridge for Windows PowerShell 5.1; no runtime C# compilation. -->
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
-    <AssemblyName>FileXfer.Launcher</AssemblyName>
+    <AssemblyName>Xfer.Launcher</AssemblyName>
     <OutputType>Library</OutputType>
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>

@@ -1,12 +1,12 @@
-﻿# common/install.ps1 -- build one .reg and import the FileXfer menu (HKCU).
+﻿# common/install.ps1 -- build one .reg and import the Xfer menu (HKCU).
 # Dot-source loads functions only; direct run performs the install.
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Stop"
 
-$script:MenuName = "FileXfer"
-$script:KeyName = "FileXfer"
+$script:MenuName = "Xfer"
+$script:KeyName = "Xfer"
 $script:Launcher = Join-Path $PSScriptRoot "context-menu.vbs"
-$script:FileXferScript = Join-Path (Split-Path $PSScriptRoot -Parent) "FileXfer.ps1"
+$script:XferScript = Join-Path (Split-Path $PSScriptRoot -Parent) "Xfer.ps1"
 $script:MenuItems = @(
     [pscustomobject]@{ Id = "01-open"; Label = "Open"; Mode = "optical" }
 )
@@ -104,20 +104,20 @@ function Build-RegistryLines {
 function Import-RegistryLines {
     param([string[]]$Lines, [string]$TemporaryRoot)
 
-    $path = Join-Path $TemporaryRoot "FileXfer.reg"
+    $path = Join-Path $TemporaryRoot "Xfer.reg"
     [IO.File]::WriteAllLines($path, $Lines, [Text.Encoding]::Unicode)
     return (Invoke-RegExe -CommandArguments @("import", $path)) -eq 0
 }
 
 function Invoke-Install {
     $temporaryRoot = Join-Path $env:TEMP (
-        "FileXfer_install_" + [Guid]::NewGuid().ToString("N"))
+        "Xfer_install_" + [Guid]::NewGuid().ToString("N"))
     try {
         if (-not (Test-Path -LiteralPath $script:Launcher -PathType Leaf)) {
             throw "context menu launcher not found: $script:Launcher"
         }
-        if (-not (Test-Path -LiteralPath $script:FileXferScript -PathType Leaf)) {
-            throw "FileXfer launcher not found: $script:FileXferScript"
+        if (-not (Test-Path -LiteralPath $script:XferScript -PathType Leaf)) {
+            throw "Xfer launcher not found: $script:XferScript"
         }
 
         New-Item -ItemType Directory -Path $temporaryRoot -Force | Out-Null
@@ -126,7 +126,7 @@ function Invoke-Install {
         }
 
         Write-Host ""
-        Write-Host '  FileXfer was added to the right-click menu of files, folders, folder backgrounds and the desktop.' -ForegroundColor Green
+        Write-Host '  Xfer was added to the right-click menu of files, folders, folder backgrounds and the desktop.' -ForegroundColor Green
         return $true
     }
     catch {
@@ -135,7 +135,7 @@ function Invoke-Install {
         return $false
     }
     finally {
-        $registryFile = Join-Path $temporaryRoot "FileXfer.reg"
+        $registryFile = Join-Path $temporaryRoot "Xfer.reg"
         if (Test-Path -LiteralPath $registryFile -PathType Leaf) {
             Remove-Item -LiteralPath $registryFile -Force -ErrorAction SilentlyContinue
         }

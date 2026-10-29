@@ -6,7 +6,7 @@
     <Nullable>disable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <LangVersion>5</LangVersion>
-    <StartupObject>FileXfer.RegressionTests</StartupObject>
+    <StartupObject>Xfer.RegressionTests</StartupObject>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
   <ItemGroup>

@@ -7,15 +7,15 @@
   var FRAME_RATES = [10, 15, 20, 24, 30, 60];
   var COLUMNS = [1, 2, 3];
   var DEFAULT_FPS = 30, DEFAULT_COLUMNS = 1;
-  // Tile (named "fx2" in settings and requests): the whole window in cells; 15 pictures a second (half a 30 fps
-  // camera's rate) gives every patch one exposure inside a single picture, whatever the camera's rolling shutter does.
-  var DEFAULT_LAYOUT = "fx2", DEFAULT_FX2_FPS = 15, DEFAULT_COARSE = 0, MAX_CELL = 32;
+  // Tile (named "fx2" in settings and requests): independent patches fill the window. 30 fps was fastest
+  // in the C920 screen-to-file measurements; patches crossing a display transition are recovered later.
+  var DEFAULT_LAYOUT = "fx2", DEFAULT_FX2_FPS = 30, DEFAULT_COARSE = 0, MAX_CELL = 32;
   // Tile cells are set and shown in CSS px (3 by default, like the rest of the page) and drawn in whole device
   // pixels: the CSS size times the pixel ratio, rounded.
   var DEFAULT_CELL = 3, MAX_CSS_CELL = 16;
   var cellOverride = null; // device px from --cell (measurements), not saved
   // Full HD capture: every cell or QR module covers half as many pixels again as at 1280.
-  var DEFAULT_CAMERA_WIDTH = 1920;
+  var DEFAULT_CAMERA_WIDTH = 1920, DEFAULT_WORKERS = 3;
   var EC_LIMIT = { L: 2953, M: 2331, Q: 1663, H: 1273 };
 
   // ---------------------------------------------------------------- native component
@@ -347,7 +347,7 @@
   // QR and Tile keep their own frame rate and error correction.
   function layout() { return setting("layout", DEFAULT_LAYOUT) === "qr" ? "qr" : "fx2"; }
   function fps() { return layout() === "fx2" ? setting("fx2Fps", DEFAULT_FX2_FPS) : setting("fps", DEFAULT_FPS); }
-  function ec() { return layout() === "fx2" ? setting("fx2Ec", "M") : setting("ec", "L"); }
+  function ec() { return layout() === "fx2" ? setting("fx2Ec", "L") : setting("ec", "L"); }
   // Cell size in device pixels; three CSS pixels until changed.
   function pixelRatio() { return window.devicePixelRatio || 1; }
   // The CSS size, saved as "cell".
@@ -369,13 +369,14 @@
     });
     $("frameBytes").querySelector(".select-value").textContent = count(frameBytes) + " bytes";
     $("frameRate").querySelector(".select-value").textContent = setting("fps", DEFAULT_FPS) + " fps";
+    $("tileColor").setAttribute("aria-checked", setting("color", false) ? "true" : "false");
     $("tileRate").querySelector(".select-value").textContent = setting("fx2Fps", DEFAULT_FX2_FPS) + " fps";
     $("columns").querySelector(".select-value").textContent = columnsLabel(setting("columns", DEFAULT_COLUMNS));
     document.querySelectorAll("#ecGroup button").forEach(function (button) {
       button.classList.toggle("is-on", button.getAttribute("data-ec") === setting("ec", "L"));
     });
     document.querySelectorAll("#tileEcGroup button").forEach(function (button) {
-      button.classList.toggle("is-on", button.getAttribute("data-ec") === setting("fx2Ec", "M"));
+      button.classList.toggle("is-on", button.getAttribute("data-ec") === setting("fx2Ec", "L"));
     });
     $("cellValue").textContent = cellShown() + " px";
     $("cellSmaller").disabled = cellShown() <= 1;
@@ -410,6 +411,7 @@
   document.querySelectorAll("#coarseGroup button").forEach(function (button) {
     button.addEventListener("click", function () { save("coarse", Number(button.getAttribute("data-coarse"))); renderSendSettings(); });
   });
+  $("tileColor").addEventListener("click", function () { save("color", !setting("color", false)); renderSendSettings(); });
   function changeCell(step) {
     cellOverride = null;
     save("cell", Math.max(1, Math.min(MAX_CSS_CELL, Math.round(cellShown()) + step)));
@@ -455,7 +457,7 @@
   function startSending() {
     state.starting = true;
     updateSendButtons();
-    job("send.start", { layout: layout(), frameBytes: setting("frameBytes", 1000), fps: fps(), ec: ec(),
+    job("send.start", { layout: layout(), frameBytes: setting("frameBytes", 1000), fps: fps(), ec: ec(), color: setting("color", false),
       columns: setting("columns", DEFAULT_COLUMNS), rows: setting("rows", 1) }).then(function (session) {
       present(session);
     }).catch(fail).then(function () {
@@ -470,10 +472,13 @@
     state.sending = { session: session, sequence: 0, tiles: tiles, next: 0, interval: 1000 / session.framesPerSecond, scale: 1,
       fx2: session.layout === "fx2", cell: cell(), coarse: setting("coarse", DEFAULT_COARSE) };
     $("presentFrame").classList.toggle("is-fx2", state.sending.fx2);
+    $("present").classList.toggle("is-fx2", state.sending.fx2);
     $("present").hidden = false;
+    $("presentBar").style.opacity = "";
+    native("send.presentation", { fullscreen: state.sending.fx2 });
     sizePresentation();
     requestAnimationFrame(tick);
-    $("stopQr").focus();
+    if (state.sending.fx2) $("present").focus(); else $("stopQr").focus();
   }
 
   var diagnosticFrames = 0;
@@ -514,12 +519,13 @@
   // The QR image has whole device pixels per module and is placed on whole device pixels, so it is drawn one
   // image pixel per screen pixel: every module keeps the same sharp size. "QR の大きさ" is the size of one code;
   // several codes side by side shrink together when the window is too narrow for them.
-  // Tile fills the window above the bar, from its top-left corner (whole device pixels), one image pixel per screen
+  // Tile fills the window, from its top-left corner (whole device pixels), one image pixel per screen
   // pixel; the layout of that size says how many patches (sequence numbers) each picture carries.
   function sizeFx2() {
-    var s = state.sending, ratio = window.devicePixelRatio || 1, gap = 12, bar = 34;
+    // Controls overlay the data and hide while the pointer is away from the bottom edge.
+    var s = state.sending, ratio = window.devicePixelRatio || 1, bar = 34;
     s.width = Math.floor(window.innerWidth * ratio);
-    s.height = Math.floor((window.innerHeight - bar - 2 * gap) * ratio);
+    s.height = Math.floor(window.innerHeight * ratio);
     s.cell = cell(); // the same CSS size on a screen of another pixel ratio
     try {
       var layout = native("send.fx2layout", { width: s.width, height: s.height, cell: s.cell, coarse: s.coarse });
@@ -530,7 +536,7 @@
     frame.style.top = "0px";
     image.style.width = s.width / ratio + "px";
     image.style.height = s.height / ratio + "px";
-    $("presentBar").style.top = (s.height / ratio + gap) + "px";
+    $("presentBar").style.top = (s.height / ratio - bar) + "px";
     showFrame();
     $("presentSize").textContent = "セル " + cellShown() + " px";
     $("presentSmaller").disabled = cellShown() <= 1;
@@ -569,6 +575,7 @@
   function stopSending() {
     if (!state.sending) return;
     state.sending = null;
+    native("send.presentation", { fullscreen: false });
     $("present").hidden = true;
     try { native("send.stop"); } catch (error) { /* the session ends with the window anyway */ }
     $("showQr").focus();
@@ -611,7 +618,7 @@
     var running = !!state.camera;
     document.querySelectorAll("#widthGroup button").forEach(function (b) { b.classList.toggle("is-on", Number(b.getAttribute("data-width")) === setting("cameraWidth", DEFAULT_CAMERA_WIDTH)); b.disabled = running; });
     document.querySelectorAll("#fpsGroup button").forEach(function (b) { b.classList.toggle("is-on", Number(b.getAttribute("data-fps")) === setting("cameraFps", 30)); b.disabled = running; });
-    document.querySelectorAll("#workersGroup button").forEach(function (b) { b.classList.toggle("is-on", Number(b.getAttribute("data-workers")) === setting("workers", 2)); b.disabled = running; });
+    document.querySelectorAll("#workersGroup button").forEach(function (b) { b.classList.toggle("is-on", Number(b.getAttribute("data-workers")) === setting("workers", DEFAULT_WORKERS)); b.disabled = running; });
     $("cameraSelect").disabled = running;
     $("openWhenDone").setAttribute("aria-checked", setting("openWhenDone", true) ? "true" : "false");
     $("cameraButton").textContent = running ? "読むのをやめる" : "この PC のカメラで読む";
@@ -648,7 +655,7 @@
   function startReceiving() {
     resetMeter();
     try {
-      native("receive.start", { camera: setting("camera", ""), width: setting("cameraWidth", DEFAULT_CAMERA_WIDTH), fps: setting("cameraFps", 30), workers: setting("workers", 2), openWhenDone: setting("openWhenDone", true) });
+      native("receive.start", { camera: setting("camera", ""), width: setting("cameraWidth", DEFAULT_CAMERA_WIDTH), fps: setting("cameraFps", 30), workers: setting("workers", DEFAULT_WORKERS), openWhenDone: setting("openWhenDone", true) });
     } catch (error) { fail(error); return; }
     state.camera = { preview: -1, hintDismissed: false, timer: setInterval(pollCamera, 33) };
     $("previewIdle").textContent = "";
@@ -815,6 +822,16 @@
   // ---------------------------------------------------------------- keyboard and background polling
 
   document.addEventListener("keydown", function (event) {
+    if (event.key === "Tab" && state.sending && state.sending.fx2) {
+      event.preventDefault();
+      var controls = [$("presentSmaller"), $("presentLarger"), $("stopQr")];
+      var index = controls.indexOf(document.activeElement), direction = event.shiftKey ? -1 : 1;
+      if (index < 0) index = event.shiftKey ? 0 : -1;
+      do { index = (index + direction + controls.length) % controls.length; } while (controls[index].disabled);
+      $("presentBar").style.opacity = "1";
+      controls[index].focus();
+      return;
+    }
     if (event.key !== "Escape") return;
     if (openMenu) { closeMenu(); return; }
     if (!$("tipsDialog").hidden) { $("tipsDialog").hidden = true; return; }
@@ -884,6 +901,7 @@
     if (auto.columns) settings.columns = auto.columns;
     if (auto.rows) settings.rows = auto.rows;
     if (auto.cell) cellOverride = auto.cell;
+    if (auto.color !== null && auto.color !== undefined) settings.color = auto.color;
     if (auto.coarse !== null && auto.coarse !== undefined) settings.coarse = auto.coarse;
     settings.keystoneX = auto.keystoneX || 0;
     settings.keystoneY = auto.keystoneY || 0;

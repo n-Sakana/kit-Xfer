@@ -1,7 +1,7 @@
 "use strict";
 
-var BUILD_ID = "__FileXfer_BUILD_ID__";
-var CACHE_NAME = "ferry-shell-" + BUILD_ID;
+var BUILD_ID = "__Xfer_BUILD_ID__";
+var CACHE_NAME = "xfer-shell-" + BUILD_ID;
 var SHELL = [
   "/",
   "/app.css?v=" + BUILD_ID,
@@ -39,7 +39,7 @@ self.addEventListener("activate", function (event) {
   event.waitUntil(
     caches.keys().then(function (names) {
       return Promise.all(names.filter(function (name) {
-        return name.indexOf("ferry-shell-") === 0 && name !== CACHE_NAME;
+        return name.indexOf("xfer-shell-") === 0 && name !== CACHE_NAME;
       }).map(function (name) {
         return caches.delete(name);
       }));

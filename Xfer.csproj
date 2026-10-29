@@ -6,8 +6,9 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <Nullable>disable</Nullable>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
-    <AssemblyName>FileXfer</AssemblyName>
-    <RootNamespace>FileXfer</RootNamespace>
+    <AssemblyName>Xfer</AssemblyName>
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory).'))=/_/Xfer</PathMap>
+    <RootNamespace>Xfer</RootNamespace>
     <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
     <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">true</PublishSingleFile>
     <SelfContained Condition="'$(RuntimeIdentifier)' != ''">true</SelfContained>
@@ -24,18 +25,18 @@
       <Private>true</Private>
     </Reference>
 
-    <EmbeddedResource Include="web/index.html" LogicalName="FileXfer.Web.index.html" />
-    <EmbeddedResource Include="web/app.css" LogicalName="FileXfer.Web.app.css" />
-    <EmbeddedResource Include="web/optical-core.js" LogicalName="FileXfer.Web.optical-core.js" />
-    <EmbeddedResource Include="web/zxing-reader.js" LogicalName="FileXfer.Web.zxing-reader.js" />
-    <EmbeddedResource Include="web/diagnostics.js" LogicalName="FileXfer.Web.diagnostics.js" />
-    <EmbeddedResource Include="web/app.js" LogicalName="FileXfer.Web.app.js" />
-    <EmbeddedResource Include="web/qr-worker.js" LogicalName="FileXfer.Web.qr-worker.js" />
-    <EmbeddedResource Include="web/zxing_reader-EOacYbLr.wasm" LogicalName="FileXfer.Web.zxing_reader-EOacYbLr.wasm" />
-    <EmbeddedResource Include="web/icon.svg" LogicalName="FileXfer.Web.icon.svg" />
-    <EmbeddedResource Include="web/manifest.webmanifest" LogicalName="FileXfer.Web.manifest.webmanifest" />
-    <EmbeddedResource Include="web/service-worker.js" LogicalName="FileXfer.Web.service-worker.js" />
-    <EmbeddedResource Include="ui/fonts/Inter-*.ttf" LogicalName="FileXfer.Fonts.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="web/index.html" LogicalName="Xfer.Web.index.html" />
+    <EmbeddedResource Include="web/app.css" LogicalName="Xfer.Web.app.css" />
+    <EmbeddedResource Include="web/optical-core.js" LogicalName="Xfer.Web.optical-core.js" />
+    <EmbeddedResource Include="web/zxing-reader.js" LogicalName="Xfer.Web.zxing-reader.js" />
+    <EmbeddedResource Include="web/diagnostics.js" LogicalName="Xfer.Web.diagnostics.js" />
+    <EmbeddedResource Include="web/app.js" LogicalName="Xfer.Web.app.js" />
+    <EmbeddedResource Include="web/qr-worker.js" LogicalName="Xfer.Web.qr-worker.js" />
+    <EmbeddedResource Include="web/zxing_reader-EOacYbLr.wasm" LogicalName="Xfer.Web.zxing_reader-EOacYbLr.wasm" />
+    <EmbeddedResource Include="web/icon.svg" LogicalName="Xfer.Web.icon.svg" />
+    <EmbeddedResource Include="web/manifest.webmanifest" LogicalName="Xfer.Web.manifest.webmanifest" />
+    <EmbeddedResource Include="web/service-worker.js" LogicalName="Xfer.Web.service-worker.js" />
+    <EmbeddedResource Include="ui/fonts/Inter-*.ttf" LogicalName="Xfer.Fonts.%(Filename)%(Extension)" />
 
     <None Update="lib\zxing.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Update="lib\LICENSE-ZXing.Net.txt" CopyToOutputDirectory="PreserveNewest" />

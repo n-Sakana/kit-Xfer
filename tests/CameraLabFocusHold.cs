@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FileXfer.Lab;
+namespace Xfer.Lab;
 
 internal static partial class CameraLab
 {
@@ -19,7 +19,7 @@ internal static partial class CameraLab
             throw new ArgumentException("Output directory must be empty: " + output);
         var selected = SelectCamera(args.Length == 3 ? args[2] : "C920");
         Directory.CreateDirectory(output);
-        Environment.SetEnvironmentVariable("FileXfer_LOG_DIR", Path.Combine(output, "trace"));
+        Environment.SetEnvironmentVariable("Xfer_LOG_DIR", Path.Combine(output, "trace"));
         using var log = Writer(output, "controls.jsonl");
         var clock = Stopwatch.StartNew();
         var camera = new MediaFoundationCamera(selected.Id, 1920, 30);

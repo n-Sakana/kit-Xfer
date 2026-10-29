@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.IO;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class OutputLayout
     {
@@ -43,6 +43,28 @@ namespace FileXfer
                 var outputDirectory = FindAvailableDirectory(Path.Combine(root, folderName));
                 Directory.CreateDirectory(outputDirectory);
                 return outputDirectory;
+            }
+        }
+
+        // Publish a verified streaming transfer in one directory rename. No partially verified files
+        // become a normal output directory, and no reserved destination needs to be deleted first.
+        public static string PublishRunDirectory(string outputRoot, string targetName, string staging)
+        {
+            var root = Path.GetFullPath(outputRoot);
+            Directory.CreateDirectory(root);
+            var folderName = SafeFileName(targetName) + "_" + DateTime.Now.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+            lock (DirectoryGate)
+            {
+                while (true)
+                {
+                    var destination = FindAvailableDirectory(Path.Combine(root, folderName));
+                    try { Directory.Move(staging, destination); return destination; }
+                    catch (IOException)
+                    {
+                        if (!Directory.Exists(staging) || (!File.Exists(destination) && !Directory.Exists(destination))) throw;
+                        // Another process may have claimed the name between the lookup and rename.
+                    }
+                }
             }
         }
 

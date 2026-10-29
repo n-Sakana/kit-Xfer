@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 
-namespace FileXfer
+namespace Xfer
 {
     internal static class JsonCodec
     {

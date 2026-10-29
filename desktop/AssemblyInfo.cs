@@ -1,2 +1,2 @@
 using System.Runtime.CompilerServices;
-[assembly: InternalsVisibleTo("FileXfer.MiniUI.Probe")]
+[assembly: InternalsVisibleTo("Xfer.MiniUI.Probe")]

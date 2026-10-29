@@ -1,4 +1,4 @@
-' common/context-menu.vbs -- open or activate FileXfer without a console.
+' common/context-menu.vbs -- open or activate Xfer without a console.
 Option Explicit
 
 Dim shell
@@ -43,6 +43,6 @@ End If
 exitCode = shell.Run(command, 0, True)
 If exitCode <> 0 Then
     MsgBox _
-        "FileXfer could not open.", _
-        vbExclamation, "FileXfer"
+        "Xfer could not open.", _
+        vbExclamation, "Xfer"
 End If

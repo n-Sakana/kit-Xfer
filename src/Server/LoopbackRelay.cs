@@ -6,16 +6,16 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace FileXfer
+namespace Xfer
 {
     // Used on Linux only. The managed HttpListener there answers a request only when its Host header names one of
     // the listener's prefixes, but tailscale serve hands the phone's requests over with the tailnet Host
-    // (device.tailnet.ts.net:10000). The relay owns FileXfer's loopback port, passes each request on to the listener
-    // (on another loopback port) under the listener's own name, and keeps the original Host in X-FileXfer-Host for the
+    // (device.tailnet.ts.net:10000). The relay owns Xfer's loopback port, passes each request on to the listener
+    // (on another loopback port) under the listener's own name, and keeps the original Host in X-Xfer-Host for the
     // request role. One request per connection. Like the listener on Windows, it listens on 127.0.0.1 only.
     internal sealed class LoopbackRelay : IDisposable
     {
-        public const string OriginalHostHeader = "X-FileXfer-Host";
+        public const string OriginalHostHeader = "X-Xfer-Host";
         private const int MaxHeadBytes = 64 * 1024;
         private static readonly Encoding Latin1 = Encoding.GetEncoding(28591);
 
@@ -42,7 +42,7 @@ namespace FileXfer
             }
         }
 
-        // Takes FileXfer's port now, so a second FileXfer on the same port fails here as it would with the listener.
+        // Takes Xfer's port now, so a second Xfer on the same port fails here as it would with the listener.
         public void Start(int target)
         {
             _target = target;

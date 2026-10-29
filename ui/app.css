@@ -138,6 +138,8 @@ h1, h2, p, ul { margin: 0; }
 .present-qr img { display: block; }
 .present-qr.is-fx2 { border-radius: 0; }
 .present-bar { position: absolute; left: 0; right: 0; height: 34px; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.present.is-fx2 .present-bar { opacity: 0; background: var(--page); }
+.present.is-fx2 .present-bar:hover, .present.is-fx2 .present-bar:focus-within { opacity: 1; }
 
 /* ---------------------------------------------------------------- receive */
 .preview { flex: 1; min-height: 160px; position: relative; background: var(--inset); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
