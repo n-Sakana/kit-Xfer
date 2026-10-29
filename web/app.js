@@ -93,7 +93,7 @@
   registerServiceWorker();
   watchCameraChanges();
   setPickerDisabled(true);
-  setListMessage("opticalFiles", "読み込んでいます", "loading-state");
+  setListMessage("opticalFiles", "Loading", "loading-state");
   loadInitialState();
 
   async function loadInitialState() {
@@ -444,7 +444,7 @@
     var dark = isDarkThemeActive();
     document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
       button.setAttribute("aria-pressed", dark ? "true" : "false");
-      button.setAttribute("aria-label", dark ? "ライトにする" : "ダークにする");
+      button.setAttribute("aria-label", dark ? "Use light theme" : "Use dark theme");
     });
   }
 
@@ -516,7 +516,7 @@
   }
 
   function applyStatus(status) {
-    var device = status && status.device ? status.device : "この PC";
+    var device = status && status.device ? status.device : "This PC";
     var browserHost = window.location.hostname.toLowerCase();
     var fallbackRole = browserHost === "localhost" || browserHost === "127.0.0.1" ? "local" : "remote";
     var role = status && (status.role === "local" || status.role === "remote") ? status.role : fallbackRole;
@@ -531,16 +531,15 @@
     updateOpticalAction();
   }
 
-  // カメラは抜き差しされる。API の有無だけでなく実際の台数を数え、
-  // devicechange で数え直す。再起動しなくても付けた瞬間に表に出る。
+  // Recount devices on devicechange so camera availability follows hotplug events.
   function refreshCameraStatus() {
     var api = Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     if (!api) {
-      setCapability("statusCamera", "利用不可", false);
+      setCapability("statusCamera", "Unavailable", false);
       return;
     }
     if (!navigator.mediaDevices.enumerateDevices) {
-      setCapability("statusCamera", "利用可能", true);
+      setCapability("statusCamera", "Available", true);
       return;
     }
     navigator.mediaDevices.enumerateDevices().then(function (devices) {
@@ -548,11 +547,11 @@
       for (var i = 0; i < devices.length; i++) {
         if (devices[i].kind === "videoinput") { count++; }
       }
-      // 権限が無いと label は空になるが、台数は数えられる。
-      setCapability("statusCamera", count > 0 ? (count + " 台") : "なし", count > 0);
+      // Device labels may be empty before permission is granted.
+      setCapability("statusCamera", count > 0 ? (count + " devices") : "None", count > 0);
       updateOpticalAction();
     }).catch(function () {
-      setCapability("statusCamera", "利用可能", true);
+      setCapability("statusCamera", "Available", true);
     });
   }
 
@@ -606,7 +605,7 @@
     if (files.length === 0) {
       appendMessage(
         container,
-        state.role === "remote" ? "PC でファイルかフォルダを選んでください" : "ファイルかフォルダを選んでください",
+        state.role === "remote" ? "Choose files or a folder on the PC" : "Choose files or a folder",
         "empty-state");
       return;
     }
@@ -703,7 +702,7 @@
     });
     document.getElementById("sendSummary").textContent = files.length === 0
       ? ""
-      : selected.length.toLocaleString("ja-JP") + " ファイル · " + formatBytes(selected.reduce(function (total, file) {
+      : "Files: " + selected.length.toLocaleString("en-US") + " · " + formatBytes(selected.reduce(function (total, file) {
         return total + file.size;
       }, 0));
     if (mode === "optical") {
@@ -745,7 +744,7 @@
         return;
       }
       if (!result.folder) {
-        throw new Error("選んだものを読み込めませんでした。");
+        throw new Error("Could not load the selection.");
       }
       applyFolder(mode, result.folder);
     } catch (error) {
@@ -827,7 +826,7 @@
       state.opticalSession = result;
       requestScreenWakeLock();
       state.opticalPreviousFocus = document.activeElement;
-      setQrStatus("QR を準備しています", false);
+      setQrStatus("Preparing QR codes", false);
       document.getElementById("qrOverlay").hidden = false;
       document.getElementById("closeQr").focus({ preventScroll: true });
       startQrRenderer(result);
@@ -848,7 +847,7 @@
     }
     var dialog = document.getElementById("confirmDialog");
     document.getElementById("confirmText").textContent = formatBytes(result.originalBytes) +
-      " あります。送り終えるまで少なくとも " + formatSeconds(result.minimumSeconds) + "かかります。";
+      " total. Sending will take at least " + formatSeconds(result.minimumSeconds) + ".";
     dialog.returnValue = "";
     return new Promise(function (resolve) {
       dialog.addEventListener("close", function () { resolve(dialog.returnValue === "ok"); }, { once: true });
@@ -869,7 +868,7 @@
     if (!Array.from(control.options).some(function (option) { return Number(option.value) === value; })) {
       var option = document.createElement("option");
       option.value = String(value);
-      option.textContent = Number(value).toLocaleString("ja-JP") + " bytes（自動調整）";
+      option.textContent = Number(value).toLocaleString("en-US") + " bytes (adjusted)";
       option.dataset.actual = "true";
       control.appendChild(option);
     }
@@ -915,7 +914,7 @@
       diag.sample("send.draw", session.transferId, 0, { sequence: entry.sequence, lateMs: Math.max(0, now - renderer.nextAt) });
       if (renderer.drawn === 1 || renderer.retrying) {
         renderer.retrying = false;
-        setQrStatus("QR を表示しています", false);
+        setQrStatus("Displaying QR codes", false);
       }
       renderer.nextAt += renderer.interval;
       // Do not rapidly flash several catch-up frames after a stalled request/tab.
@@ -966,14 +965,14 @@
     } catch (error) {
       if (!isCurrentQrRenderer(renderer)) return;
       if (error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429) {
-        showToast("QR を出すのが止まりました。もう一度出してください。");
+        showToast("The QR display stopped. Start sending again.");
         stopOptical();
         return;
       }
       batch.failures++;
       diag.sample("send.batch.retry", renderer.session.transferId, 0, { failures: batch.failures, status: error.status || 0 });
       renderer.retrying = true;
-      setQrStatus("PC とのつながりを待っています", true);
+      setQrStatus("Waiting for the PC connection", true);
       batch.retryTimer = window.setTimeout(function () {
         batch.retryTimer = null;
         fetchQrBatch(renderer, batch);
@@ -1121,13 +1120,13 @@
     state.cameraLastDecodedAt = 0;
     state.cameraFrameId = 0;
     var generation = ++state.cameraGeneration;
-    setCameraLabel("カメラを準備しています");
+    setCameraLabel("Starting camera");
     updateOpticalAction();
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       finishCameraError(window.isSecureContext
-        ? "このブラウザではカメラを使えません。"
-        : "カメラを使うには https の安全な接続で開いてください。");
+        ? "This browser does not support camera access."
+        : "Open this page over HTTPS to use the camera.");
       return;
     }
 
@@ -1199,7 +1198,7 @@
         onTransient: function () {
           diag.sample("relay.retry", diag.id(receiverId), 0);
           if (generation === state.cameraGeneration && state.cameraRunning)
-            document.getElementById("receiveState").textContent = "PC とのつながりを待っています";
+            document.getElementById("receiveState").textContent = "Waiting for the PC connection";
         },
         onFatal: function (error) {
           diag.event("relay.failed", diag.id(receiverId), { status: error.status || 0 });
@@ -1214,13 +1213,13 @@
       stream.getVideoTracks().forEach(function (track) {
         track.addEventListener("ended", function () {
           if (generation === state.cameraGeneration && state.cameraRunning)
-            { diag.event("camera.track_ended", diag.id(state.cameraReceiverId)); finishCameraError("カメラが外れました。つなぎ直して、もう一度読んでください。"); }
+            { diag.event("camera.track_ended", diag.id(state.cameraReceiverId)); finishCameraError("The camera was disconnected. Reconnect it and try again."); }
         });
       });
       document.getElementById("cameraPreview").classList.add("is-live");
       applyCameraExtras();
-      document.getElementById("receiveState").textContent = "QR を待っています";
-      setCapability("statusCamera", "利用可能", true);
+      document.getElementById("receiveState").textContent = "Waiting for QR codes";
+      setCapability("statusCamera", "Available", true);
       updateOpticalAction();
       armCameraQuietHint(generation);
       scheduleCameraFrame(generation);
@@ -1252,7 +1251,7 @@
       try {
         await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
       } catch (_) {
-        // 上流と同じく、continuous focus を拒むカメラは元の設定のまま使う。
+        // Preserve the current focus mode if continuous focus is unsupported.
       }
     }
 
@@ -1282,7 +1281,7 @@
         frameRate: { ideal: Number(document.getElementById("cameraFps").value || "60") }
       });
     } catch (_) {
-      showToast("このカメラは読んでいる間に設定を変えられません。読み直すと変わります。");
+      showToast("This camera cannot change settings while scanning. Stop and restart it to apply the settings.");
     }
   }
 
@@ -1302,13 +1301,12 @@
           slot.busy = false;
           slot.failed = true;
           worker.terminate();
-          // The worker already knows why it died. Showing only the fixed sentence
-          // hid the real cause and left nothing to act on.
+          // Include the worker failure detail so startup errors identify their cause.
           if (reason && !state.cameraWorkerReason) state.cameraWorkerReason = String(reason);
           if (generation === state.cameraGeneration && state.cameraWorkers.indexOf(slot) >= 0 &&
               state.cameraWorkers.every(function (candidate) { return candidate.failed; }))
-            finishCameraError("QR の読み取りを始められませんでした。ページを読み込み直してください。"
-              + (state.cameraWorkerReason ? "（" + state.cameraWorkerReason + "）" : ""));
+            finishCameraError("Could not start QR scanning. Reload the page and try again."
+              + (state.cameraWorkerReason ? " (" + state.cameraWorkerReason + ")" : ""));
         };
         slot.initTimer = window.setTimeout(fail, 15000);
         worker.onmessage = function (event) {
@@ -1447,19 +1445,19 @@
     var now = Date.now();
     if (result.complete || !state.receiveShownAt || now - state.receiveShownAt >= 1000) {
       state.receiveShownAt = now;
-      document.getElementById("receiveState").textContent = result.complete ? "受け取りました" : "受け取っています " + percent + "%";
+      document.getElementById("receiveState").textContent = result.complete ? "Received" : "Receiving " + percent + "%";
       document.getElementById("receiveRate").textContent = formatRate(result.kilobytesPerSecond);
       var elapsed = Number(result.elapsedSeconds || 0);
       var progress = Number(result.progress || 0);
       var remaining = progress > 0 && progress < 1 ? elapsed * (1 - progress) / progress : 0;
       document.getElementById("receiveEta").textContent = result.complete
-        ? "合計 " + formatSeconds(elapsed)
+        ? "Total: " + formatSeconds(elapsed)
         : remaining > 0
-          ? "残り " + formatSeconds(remaining)
+          ? "Remaining: " + formatSeconds(remaining)
           : "";
       document.getElementById("receiveDetail").textContent =
-        Number(result.solvedBlocks || 0).toLocaleString("ja-JP") + " / " +
-        Number(result.sourceBlocks || 0).toLocaleString("ja-JP") + " ブロック";
+        Number(result.solvedBlocks || 0).toLocaleString("en-US") + " / " +
+        Number(result.sourceBlocks || 0).toLocaleString("en-US") + " blocks";
     }
 
     if (!result.complete) {
@@ -1473,16 +1471,16 @@
     document.getElementById("receiveProgressBar").classList.add("is-done");
     document.getElementById("receiveProgress").setAttribute("aria-valuenow", "100");
     document.getElementById("receiveResultText").textContent =
-      Number(result.fileCount || 0).toLocaleString("ja-JP") + " ファイル · " + formatBytes(result.totalBytes);
+      "Files: " + Number(result.fileCount || 0).toLocaleString("en-US") + " · " + formatBytes(result.totalBytes);
     var output = document.getElementById("receiveOutputPath");
     output.textContent = result.outputPath || "";
     output.title = result.outputPath || "";
     document.getElementById("receiveResult").hidden = false;
     stopCamera(false, true);
-    setCameraLabel("受け取りました");
-    showToast(Number(result.fileCount || 0).toLocaleString("ja-JP") + " ファイルを受け取りました");
+    setCameraLabel("Received");
+    showToast("Files received: " + Number(result.fileCount || 0).toLocaleString("en-US"));
     if (result.openError) {
-      showToast("受け取りましたが、フォルダを開けませんでした: " + result.openError);
+      showToast("Received, but could not open the folder: " + result.openError);
     }
   }
 
@@ -1513,7 +1511,7 @@
     video.srcObject = null;
     video.hidden = true;
     if (!keepLabel) {
-      setCameraLabel("カメラは止まっています");
+      setCameraLabel("Camera stopped");
     }
     if (clearServer && state.cameraReceiverId) {
       diag.fetch("/api/optical/receive/stop", {
@@ -1529,14 +1527,14 @@
     diag.event("camera.failed", diag.id(state.cameraReceiverId));
     stopCamera(true, true);
     setCameraLabel(message);
-    document.getElementById("receiveState").textContent = "止まりました";
+    document.getElementById("receiveState").textContent = "Stopped";
     showToast(message);
   }
 
   function resetReceivePanel() {
     state.cameraComplete = false;
     state.cameraHasDecoded = false;
-    document.getElementById("receiveState").textContent = "待っています";
+    document.getElementById("receiveState").textContent = "Waiting";
     document.getElementById("receiveRate").textContent = "";
     document.getElementById("receiveProgressBar").classList.remove("is-done");
     document.getElementById("receiveProgressBar").style.width = "0%";
@@ -1572,14 +1570,14 @@
   function cameraErrorMessage(error) {
     var name = error && error.name ? error.name : "";
     if (name === "NotAllowedError" || name === "SecurityError") {
-      return "カメラの使用が許可されていません。ブラウザの設定で許可して、もう一度押してください。";
+      return "Camera access is denied. Allow it in your browser settings and try again.";
     }
     if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-      setCapability("statusCamera", "なし", false);
-      return "カメラが見つかりません。";
+      setCapability("statusCamera", "None", false);
+      return "No camera was found.";
     }
     if (name === "NotReadableError" || name === "TrackStartError") {
-      return "カメラを開けません。ほかのアプリが使っていないか確認してください。";
+      return "Could not open the camera. Check whether another app is using it.";
     }
     return errorMessage(error);
   }
@@ -1594,7 +1592,7 @@
 
   function formatRate(value) {
     var rate = Math.max(0, Number(value) || 0);
-    return rate.toLocaleString("ja-JP", { maximumFractionDigits: 1 }) + " KB/s";
+    return rate.toLocaleString("en-US", { maximumFractionDigits: 1 }) + " KB/s";
   }
 
   function shutdownCamera() {
@@ -1620,10 +1618,10 @@
     var cameraButton = document.getElementById("readLocalCamera");
     cameraButton.disabled = !state.status;
     cameraButton.textContent = state.cameraRunning || state.cameraStarting
-      ? "読むのをやめる"
+      ? "Stop scanning"
       : state.role === "remote"
-        ? "この端末のカメラで読む"
-        : "この PC のカメラで読む";
+        ? "Use device camera"
+        : "Use PC camera";
     document.getElementById("showRemoteQr").disabled = state.opticalBusy
       || state.role !== "local"
       || state.remotes.length === 0
@@ -1685,8 +1683,8 @@
     value = Math.max(minimum, Math.min(maximum, value || 900));
     state.qrDisplaySize = value;
     control.value = String(value);
-    document.getElementById("qrSizeSetting").textContent = value.toLocaleString("ja-JP") + " px";
-    document.getElementById("qrSizeOutput").textContent = value.toLocaleString("ja-JP") + " px";
+    document.getElementById("qrSizeSetting").textContent = value.toLocaleString("en-US") + " px";
+    document.getElementById("qrSizeOutput").textContent = value.toLocaleString("en-US") + " px";
     document.getElementById("smallerQr").disabled = value === minimum;
     document.getElementById("largerQr").disabled = value === maximum;
     if (state.opticalRenderer) {
@@ -1697,15 +1695,15 @@
   function formatSeconds(value) {
     var seconds = Math.max(0, Number(value) || 0);
     if (seconds < 10) {
-      return seconds.toFixed(1) + " 秒";
+      return seconds.toFixed(1) + " s";
     }
     if (seconds < 60) {
-      return Math.ceil(seconds).toLocaleString("ja-JP") + " 秒";
+      return Math.ceil(seconds).toLocaleString("en-US") + " s";
     }
     var rounded = Math.ceil(seconds);
     var minutes = Math.floor(rounded / 60);
     var remainder = rounded % 60;
-    return minutes.toLocaleString("ja-JP") + " 分" + (remainder ? " " + remainder + " 秒" : "");
+    return minutes.toLocaleString("en-US") + " min" + (remainder ? " " + remainder + " s" : "");
   }
 
   async function pollConnectedRemotes() {
@@ -1731,7 +1729,7 @@
     var container = document.getElementById("connectedRemotes");
     container.replaceChildren();
     if (state.remotes.length === 0) {
-      appendMessage(container, "つながっているスマホはありません", "list-empty");
+      appendMessage(container, "No phones connected", "list-empty");
       return;
     }
     state.remotes.forEach(function (remote) {
@@ -1741,7 +1739,7 @@
       dot.className = "dot";
       dot.setAttribute("aria-hidden", "true");
       row.appendChild(dot);
-      row.appendChild(textCell(remote.name || "スマホ", ""));
+      row.appendChild(textCell(remote.name || "Phone", ""));
       container.appendChild(row);
     });
   }
@@ -1756,15 +1754,15 @@
     try {
       var entry = await requestJson("/api/remote-entry");
       if (!entry || !entry.url) {
-        throw new Error("Tailscale のスマホ連携 URL を取得できませんでした。");
+        throw new Error("Could not obtain the Tailscale phone connection URL.");
       }
       image.onload = function () {
         image.hidden = false;
-        status.textContent = "スマホのカメラで読むと、この PC につながります。";
+        status.textContent = "Scan this code with your phone to connect to this PC.";
       };
       image.onerror = function () {
         image.hidden = true;
-        status.textContent = "QR を出せませんでした。";
+        status.textContent = "Could not display the QR code.";
       };
       url.textContent = entry.url;
       url.title = entry.url;
@@ -1875,9 +1873,9 @@
       return "iPhone";
     }
     if (/Android/i.test(agent)) {
-      return /Mobile/i.test(agent) ? "Android スマホ" : "Android タブレット";
+      return /Mobile/i.test(agent) ? "Android phone" : "Android tablet";
     }
-    return "スマホ";
+    return "Phone";
   }
 
   async function toggleDeviceMenu() {
@@ -1888,7 +1886,7 @@
     }
     menu.hidden = false;
     document.getElementById("remoteDeviceButton").setAttribute("aria-expanded", "true");
-    setListMessage("remoteDeviceMenu", "PC を探しています", "menu-message");
+    setListMessage("remoteDeviceMenu", "Looking for PCs", "menu-message");
     try {
       var result = await requestJson("/api/devices");
       renderDeviceOptions(result && Array.isArray(result.devices) ? result.devices : []);
@@ -1906,7 +1904,7 @@
     var menu = document.getElementById("remoteDeviceMenu");
     menu.replaceChildren();
     if (devices.length === 0) {
-      appendMessage(menu, "Xfer が動いている PC は見つかりません", "menu-message");
+      appendMessage(menu, "No PCs running Xfer were found", "menu-message");
       return;
     }
     devices.forEach(function (device) {
@@ -1973,7 +1971,7 @@
       var body;
       try { body = await response.json(); } catch (_) { body = null; }
       if (!response.ok || body === null) {
-        var error = new Error(body && body.error ? body.error : "Xfer につながりませんでした。");
+        var error = new Error(body && body.error ? body.error : "Could not connect to Xfer.");
         error.status = response.ok ? 502 : response.status;
         throw error;
       }
@@ -2009,7 +2007,7 @@
   }
 
   function errorMessage(error) {
-    return error && error.message ? error.message : "Xfer の処理中にエラーが起きました。";
+    return error && error.message ? error.message : "An Xfer operation failed.";
   }
 
   function folderLeaf(path) {
@@ -2039,7 +2037,7 @@
       unit++;
     } while (size >= 1024 && unit < units.length - 1);
     var digits = size >= 100 ? 0 : size >= 10 ? 1 : 1;
-    return size.toLocaleString("ja-JP", { maximumFractionDigits: digits }) + " " + units[unit];
+    return size.toLocaleString("en-US", { maximumFractionDigits: digits }) + " " + units[unit];
   }
 
   function formatDate(value) {

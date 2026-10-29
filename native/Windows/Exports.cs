@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Xfer
 {
-    /// <summary>The C ABI MiniUI's Windows host loads (docs/native-component.md in miniUI): miniui_call for JSON
+    /// <summary>The desktop host C ABI: miniui_call for JSON
     /// requests and miniui_image for app: images. Both run on the window's UI thread.</summary>
     public static unsafe class Exports
     {
@@ -28,7 +28,7 @@ namespace Xfer
                 int count = Utf8.GetByteCount(reply);
                 if (count > outputCapacity) {
                     Diagnostics.Sample("native.reply_capacity", "", 0, new { Required = count, Capacity = outputCapacity });
-                    return Fail("{\"error\":\"結果が大きすぎます。\"}", output, outputCapacity);
+                    return Fail("{\"error\":\"The result is too large.\"}", output, outputCapacity);
                 }
                 fixed (char* text = reply) return Utf8.GetBytes(text, reply.Length, output, outputCapacity);
             }

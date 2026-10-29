@@ -77,7 +77,7 @@ try:
         page.evaluate("() => {const c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');window.paint=setInterval(()=>{x.fillStyle='white';x.fillRect(0,0,640,480)},50);navigator.mediaDevices.getUserMedia=async()=>c.captureStream(20);}")
         page.click('#opticalDirection [data-view="receive"]')
         page.click('#readLocalCamera')
-        expect(page.locator('#cameraLabel')).to_contain_text('始められません', timeout=20000)
+        expect(page.locator('#cameraLabel')).to_contain_text('Could not start QR scanning', timeout=20000)
         for _ in range(45):
             failures = [r for r in browser_records() if r['event'] == 'worker.failed']
             if failures: break

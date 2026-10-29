@@ -185,7 +185,7 @@ namespace Xfer
         }
 
         /// <summary>The local server is what the phone talks to. A Xfer already running on the port is replaced,
-        /// as the launcher did; anything else on the port leaves this window working without the phone.</summary>
+        /// while another application on that port leaves this window usable without phone support.</summary>
         private void StartServer()
         {
             try
@@ -196,7 +196,7 @@ namespace Xfer
                 {
                     string stopError;
                     if (discovery != null || !Program.TryStopRunningXfer(_port, running, out stopError))
-                        throw new InvalidOperationException("前に起動した Xfer を止められませんでした。");
+                        throw new InvalidOperationException("Could not stop the running Xfer instance.");
                 }
                 _serverStop = new CancellationTokenSource();
                 var server = new LocalServer(_port, _state, "optical", _output, delegate { _shutdownRequested = true; });
@@ -217,7 +217,7 @@ namespace Xfer
                         string url, error;
                         bool ok = TailnetDiscovery.TryConfigureServe(port, out url, out error);
                         Diagnostics.Event("remote.serve", "native", new { Ready = ok, HasError = !string.IsNullOrEmpty(error) });
-                        _tailnet = ok ? (error ?? "") : (error ?? "Tailscale を使えません。");
+                        _tailnet = ok ? (error ?? "") : (error ?? "Tailscale is unavailable.");
                     });
             }
             catch (Exception error)
@@ -230,7 +230,7 @@ namespace Xfer
 
         private object Poll()
         {
-            // Opened again from Explorer: bring the window forward, as the WPF window did.
+            // Explorer activation brings this window to the foreground.
             int activation = _activation;
             if (activation != _raised) { _raised = activation; RaiseWindow(); }
             return new
@@ -249,7 +249,7 @@ namespace Xfer
         {
             lock (_gate)
             {
-                if (_jobs.Count >= 32) throw new InvalidOperationException("処理中の操作が多すぎます。");
+                if (_jobs.Count >= 32) throw new InvalidOperationException("Too many operations are in progress.");
                 int id = ++_nextJob;
                 Diagnostics.Event("native.job.start", id.ToString(), new { Operation = operation });
                 _jobs[id] = Task.Run(() => {
@@ -318,7 +318,7 @@ namespace Xfer
             {
                 bool known = false;
                 foreach (var file in _folder.Files) if (file.Name == name) { known = true; break; }
-                if (!known) throw new ArgumentException("そのファイルはありません。");
+                if (!known) throw new ArgumentException("That file was not found.");
                 if (on) _selected.Add(name); else _selected.Remove(name);
                 return Totals();
             }
@@ -372,14 +372,14 @@ namespace Xfer
         // ---------------------------------------------------------------- sending
 
         /// <summary>Starts a display session. columns x rows QR codes are shown at once (each one an independent
-        /// fountain frame, so the receiver needs nothing new in the protocol); the page advances the sequence by
+        /// fountain frame); the page advances the sequence by
         /// that many per display tick.</summary>
         private object StartSending(int frameBytes, int fps, string ec, int columns, int rows)
         {
             FolderSnapshot folder; List<string> names;
             lock (_gate) { folder = _folder; names = SelectedNames(); }
-            if (names.Count == 0) throw new ArgumentException("送るファイルを選んでください。");
-            if (columns < 1 || columns > TiledQr.MaximumColumns || rows < 1 || rows > TiledQr.MaximumRows) throw new ArgumentException("並べる枚数が正しくありません。");
+            if (names.Count == 0) throw new ArgumentException("Select files to send.");
+            if (columns < 1 || columns > TiledQr.MaximumColumns || rows < 1 || rows > TiledQr.MaximumRows) throw new ArgumentException("Invalid QR grid dimensions.");
             StopSending();
             var result = _optical.Start(folder, names, frameBytes, fps, ec);
             lock (_gate) _qr = new QrStream(_optical, result.Token);
@@ -399,7 +399,7 @@ namespace Xfer
         {
             FolderSnapshot folder; List<string> names;
             lock (_gate) { folder = _folder; names = SelectedNames(); }
-            if (names.Count == 0) throw new ArgumentException("送るファイルを選んでください。");
+            if (names.Count == 0) throw new ArgumentException("Select files to send.");
             StopSending();
             var result = _optical.StartFx2(folder, names, fps, ec, color);
             lock (_gate) _fx2 = new Fx2Stream(_optical, result.Token, ec, color);
@@ -414,7 +414,7 @@ namespace Xfer
         {
             Fx2Stream fx2;
             lock (_gate) fx2 = _fx2;
-            if (fx2 == null) throw new InvalidOperationException("Tile を表示していません。");
+            if (fx2 == null) throw new InvalidOperationException("No Tile display is active.");
             var layout = fx2.Layout(width, height, cell, coarse);
             return new { layout.Width, layout.Height, layout.Patches, Coarse = layout.Coarse, Tiers = layout.Tiers.Length };
         }
@@ -432,8 +432,8 @@ namespace Xfer
         private object StartReceiving(string camera, int width, int fps, int workers, bool openWhenDone)
         {
             StopReceiving();
-            if (width != 960 && width != 1280 && width != 1920) throw new ArgumentException("撮影幅が正しくありません。");
-            if (fps != 30 && fps != 60) throw new ArgumentException("撮影 fps が正しくありません。");
+            if (width != 960 && width != 1280 && width != 1920) throw new ArgumentException("Invalid capture width.");
+            if (fps != 30 && fps != 60) throw new ArgumentException("Invalid capture frame rate.");
             Diagnostics.Event("camera.request", "native", new { Camera = Diagnostics.Id(camera), Width = width, Fps = fps, Workers = workers });
             var receiver = new CameraReceiver(OpenCamera(camera, width, fps), _receiver, workers, openWhenDone);
             lock (_gate) _camera = receiver;
@@ -457,11 +457,11 @@ namespace Xfer
         private object RemoteEntry()
         {
             var server = _server;
-            if (server == null) throw new InvalidOperationException(_serverError ?? "Xfer のサーバーが動いていません。");
+            if (server == null) throw new InvalidOperationException(_serverError ?? "The Xfer server is not running.");
             string url = null;
             foreach (var device in server.Tailnet.ReadAsync().GetAwaiter().GetResult())
                 if (device.Current && !string.IsNullOrWhiteSpace(device.Url)) { url = device.Url; break; }
-            if (url == null) throw new InvalidOperationException("Tailscale につながっていません。");
+            if (url == null) throw new InvalidOperationException("Not connected to Tailscale.");
             var hints = new Dictionary<EncodeHintType, object>();
             hints[EncodeHintType.CHARACTER_SET] = "ISO-8859-1";
             hints[EncodeHintType.DISABLE_ECI] = true;
@@ -474,12 +474,12 @@ namespace Xfer
 
         private object RemoteCommand(string action, int frameBytes, int fps, string ec, int displaySize)
         {
-            if (_server == null) throw new InvalidOperationException(_serverError ?? "Xfer のサーバーが動いていません。");
+            if (_server == null) throw new InvalidOperationException(_serverError ?? "The Xfer server is not running.");
             List<string> names = null;
             if (action == "showQr")
             {
                 lock (_gate) names = SelectedNames();
-                if (names.Count == 0) throw new ArgumentException("送るファイルを選んでください。");
+                if (names.Count == 0) throw new ArgumentException("Select files to send.");
             }
             return new { Sent = _server.Remotes.SendCommand(action, names, "original", frameBytes, fps, ec, displaySize) };
         }
@@ -568,7 +568,7 @@ namespace Xfer
         private static string Text(Dictionary<string, object> r, string key)
         {
             object v;
-            if (!r.TryGetValue(key, out v) || !(v is string) || ((string)v).Length == 0) throw new ArgumentException("必要な指定がありません: " + key);
+            if (!r.TryGetValue(key, out v) || !(v is string) || ((string)v).Length == 0) throw new ArgumentException("Missing required field: " + key);
             return (string)v;
         }
 
@@ -584,10 +584,10 @@ namespace Xfer
             if (r.TryGetValue(key, out v) && v != null)
             {
                 try { return Convert.ToInt32(v, CultureInfo.InvariantCulture); }
-                catch (Exception) { throw new ArgumentException("数値の指定が正しくありません: " + key); }
+                catch (Exception) { throw new ArgumentException("Invalid numeric value: " + key); }
             }
             if (fallback.HasValue) return fallback.Value;
-            throw new ArgumentException("必要な指定がありません: " + key);
+            throw new ArgumentException("Missing required field: " + key);
         }
 
         private static bool Bool(Dictionary<string, object> r, string key)

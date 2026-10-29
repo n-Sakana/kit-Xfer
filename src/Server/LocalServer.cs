@@ -245,7 +245,7 @@ namespace Xfer
                 Diagnostics.Failure("http", DiagnosticRoute(context.Request.Url.AbsolutePath), exception);
                 errorStatus = HttpStatusCode.Forbidden;
                 error = new ErrorBody(string.Format(
-                    "このフォルダは開けません: {0}",
+                    "Could not open this folder: {0}",
                     exception.Message));
             }
             catch (IOException exception)
@@ -253,13 +253,13 @@ namespace Xfer
                 Diagnostics.Failure("http", DiagnosticRoute(context.Request.Url.AbsolutePath), exception);
                 errorStatus = HttpStatusCode.BadRequest;
                 error = new ErrorBody(string.Format(
-                    "フォルダを読めません: {0}",
+                    "Could not read this folder: {0}",
                     exception.Message));
             }
             catch (Exception exception)
             {
                 Diagnostics.Failure("http", DiagnosticRoute(context.Request.Url.AbsolutePath), exception);
-                error = new ErrorBody("Xfer の処理中にエラーが起きました。");
+                error = new ErrorBody("An Xfer operation failed.");
             }
 
             if (error != null)
@@ -350,14 +350,14 @@ namespace Xfer
 
             if (request.HttpMethod == "GET" && path == "/api/remote-entry")
             {
-                RequireLocal(role, "スマホ連携の入口はこの PC で確認してください。");
+                RequireLocal(role, "View phone connection details on this PC.");
                 var device = await ReadCurrentTailnetDeviceAsync();
                 if (device == null)
                 {
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.ServiceUnavailable,
-                        new ErrorBody("Tailscale のスマホ連携 URL を取得できませんでした。"));
+                        new ErrorBody("Could not obtain the Tailscale phone connection URL."));
                     return;
                 }
                 await WriteJsonAsync(
@@ -369,14 +369,14 @@ namespace Xfer
 
             if (request.HttpMethod == "GET" && path == "/api/remote-entry/qr")
             {
-                RequireLocal(role, "スマホ連携の QR はこの PC で表示してください。");
+                RequireLocal(role, "Display the phone pairing QR code on this PC.");
                 var device = await ReadCurrentTailnetDeviceAsync();
                 if (device == null)
                 {
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.ServiceUnavailable,
-                        new ErrorBody("Tailscale のスマホ連携 URL を取得できませんでした。"));
+                        new ErrorBody("Could not obtain the Tailscale phone connection URL."));
                     return;
                 }
                 await WriteBytesAsync(
@@ -388,7 +388,7 @@ namespace Xfer
 
             if (request.HttpMethod == "GET" && path == "/api/remotes")
             {
-                RequireLocal(role, "リモコンの一覧はこの PC で確認してください。");
+                RequireLocal(role, "View connected remotes on this PC.");
                 await WriteJsonAsync(
                     context,
                     HttpStatusCode.OK,
@@ -398,7 +398,7 @@ namespace Xfer
 
             if (request.HttpMethod == "POST" && path == "/api/remotes/heartbeat")
             {
-                RequireRemote(role, "リモコンとして開いた画面から接続してください。");
+                RequireRemote(role, "Connect from the remote control page.");
                 var body = JsonCodec.ParseObject(await ReadBodyAsync(request));
                 var id = ReadString(body, "id");
                 object nameValue;
@@ -410,7 +410,7 @@ namespace Xfer
 
             if (request.HttpMethod == "POST" && path == "/api/remotes/disconnect")
             {
-                RequireRemote(role, "リモコンとして開いた画面から切断してください。");
+                RequireRemote(role, "Disconnect from the remote control page.");
                 var body = JsonCodec.ParseObject(await ReadBodyAsync(request));
                 _remotes.Disconnect(ReadString(body, "id"));
                 await WriteJsonAsync(context, HttpStatusCode.OK, new { Disconnected = true });
@@ -419,7 +419,7 @@ namespace Xfer
 
             if (request.HttpMethod == "POST" && path == "/api/remotes/command")
             {
-                RequireLocal(role, "リモコンの操作はこの PC から実行してください。");
+                RequireLocal(role, "Control remotes from this PC.");
                 var body = JsonCodec.ParseObject(await ReadBodyAsync(request, SelectionBodyLimit(_state.ReadFolder("optical"))));
                 var action = ReadString(body, "action");
                 List<string> files = null;
@@ -492,7 +492,7 @@ namespace Xfer
 
             if (request.HttpMethod == "POST" && path == "/api/activate")
             {
-                RequireLocal(role, "右クリックから開く操作はこの PC で実行してください。");
+                RequireLocal(role, "Open context menu selections on this PC.");
 
                 int expectedProcessId;
                 var currentProcessId = GetCurrentProcessId();
@@ -516,7 +516,7 @@ namespace Xfer
                     if (!body.ContainsKey("mode") || !body.ContainsKey("path"))
                     {
                         throw new ArgumentException(
-                            "右クリックの対象と機能を両方指定してください。");
+                            "Specify both the context menu target and action.");
                     }
                     mode = ReadMode(ReadString(body, "mode"));
                     selectedPath = ReadString(body, "path");
@@ -530,7 +530,7 @@ namespace Xfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.ServiceUnavailable,
-                        new ErrorBody("Xfer のデスクトップ画面はまだ利用できません。"));
+                        new ErrorBody("The Xfer desktop window is not available yet."));
                     return;
                 }
 
@@ -549,7 +549,7 @@ namespace Xfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.Forbidden,
-                        new ErrorBody("リモコンで使えるのは光学転送だけです。"));
+                        new ErrorBody("Only optical transfer is available through the remote control."));
                     return;
                 }
                 await WriteJsonAsync(context, HttpStatusCode.OK, _state.ReadFolder(mode));
@@ -563,7 +563,7 @@ namespace Xfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.Forbidden,
-                        new ErrorBody("フォルダは PC 側で選んでください。"));
+                        new ErrorBody("Select the folder on the PC."));
                     return;
                 }
 
@@ -573,7 +573,7 @@ namespace Xfer
                 var selectedPath = body.TryGetValue("path", out pathValue) ? pathValue as string : null;
                 if (string.IsNullOrWhiteSpace(selectedPath))
                 {
-                    throw new ArgumentException("選ぶフォルダが指定されていません。");
+                    throw new ArgumentException("No folder was specified.");
                 }
 
                 await WriteJsonAsync(
@@ -590,7 +590,7 @@ namespace Xfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.Forbidden,
-                        new ErrorBody("フォルダは PC 側で選んでください。"));
+                        new ErrorBody("Select the folder on the PC."));
                     return;
                 }
 
@@ -599,7 +599,7 @@ namespace Xfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.NotImplemented,
-                        new ErrorBody("OS のフォルダ選択ダイアログはこの環境では使えません。"));
+                        new ErrorBody("The system folder picker is unavailable in this environment."));
                     return;
                 }
 
@@ -632,7 +632,7 @@ namespace Xfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.Forbidden,
-                        new ErrorBody("ファイルは PC 側で選んでください。"));
+                        new ErrorBody("Select files on the PC."));
                     return;
                 }
 
@@ -641,7 +641,7 @@ namespace Xfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.NotImplemented,
-                        new ErrorBody("OS のファイル選択ダイアログはこの環境では使えません。"));
+                        new ErrorBody("The system file picker is unavailable in this environment."));
                     return;
                 }
 
@@ -707,13 +707,13 @@ namespace Xfer
                 var receiverId = ReadString(body, "receiverId");
                 var encodedFrames = ReadStringList(body, "frames");
                 if (encodedFrames.Count < 1 || encodedFrames.Count > 8)
-                    throw new ArgumentException("一度に受け取れる QR は 1〜8 枚です。");
+                    throw new ArgumentException("Submit between 1 and 8 QR frames at a time.");
                 var frames = new List<byte[]>();
                 foreach (var encoded in encodedFrames)
                 {
                     try { frames.Add(Convert.FromBase64String(encoded)); }
                     catch (System.FormatException exception)
-                    { throw new ArgumentException("読み取った QR の内容が壊れています。", exception); }
+                    { throw new ArgumentException("The scanned QR data is corrupt.", exception); }
                 }
                 var openWhenDone = ReadOptionalBool(body, "openWhenDone", true);
                 var result = OpticalReceiveResult.NotRecognized();
@@ -739,7 +739,7 @@ namespace Xfer
                 }
                 catch (System.FormatException exception)
                 {
-                    throw new ArgumentException("読み取った QR の内容が壊れています。", exception);
+                    throw new ArgumentException("The scanned QR data is corrupt.", exception);
                 }
                 var result = _opticalReceiver.AddFrame(
                     receiverId,
@@ -765,12 +765,12 @@ namespace Xfer
                     System.Globalization.NumberStyles.None,
                     System.Globalization.CultureInfo.InvariantCulture, out sequence)
                     || !int.TryParse(request.QueryString["count"], out count))
-                    throw new ArgumentException("QR の先読み指定が正しくありません。");
+                    throw new ArgumentException("Invalid QR prefetch request.");
                 byte[] packed;
                 if (!_optical.TryRenderPackedFrames(request.QueryString["token"], sequence, count, out packed))
                 {
                     await WriteJsonAsync(context, HttpStatusCode.NotFound,
-                        new ErrorBody("光学転送の表示は終了しました。"));
+                        new ErrorBody("The transfer display has stopped."));
                     return;
                 }
                 await WriteBytesAsync(context, "application/octet-stream", packed);
@@ -799,7 +799,7 @@ namespace Xfer
                     await WriteJsonAsync(
                         context,
                         HttpStatusCode.NotFound,
-                        new ErrorBody("光学転送の表示は終了しました。"));
+                        new ErrorBody("The transfer display has stopped."));
                     return;
                 }
                 await WriteBytesAsync(
@@ -835,7 +835,7 @@ namespace Xfer
             FolderSnapshot source, List<string> selectedNames, string format,
             int frameBytes, int framesPerSecond, string errorCorrection)
         {
-            if (format != "original") throw new ArgumentException("送る形が正しくありません。", "format");
+            if (format != "original") throw new ArgumentException("Invalid transfer format.", "format");
             return _optical.Start(source, selectedNames, frameBytes, framesPerSecond, errorCorrection);
         }
 
@@ -888,7 +888,7 @@ namespace Xfer
             }
             if (mode != "optical")
             {
-                throw new ArgumentException("ファイルを選ぶ機能が正しく指定されていません。");
+                throw new ArgumentException("Invalid file selection mode.");
             }
             return mode;
         }
@@ -903,7 +903,7 @@ namespace Xfer
                 : null;
             if (raw == null)
             {
-                throw new ArgumentException("ファイルの一覧が指定されていません。");
+                throw new ArgumentException("No file list was specified.");
             }
 
             var result = new List<string>();
@@ -912,7 +912,7 @@ namespace Xfer
                 var text = item as string;
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    throw new ArgumentException("ファイル名が正しくありません。");
+                    throw new ArgumentException("Invalid file name.");
                 }
                 result.Add(text);
             }
@@ -927,7 +927,7 @@ namespace Xfer
             var result = body.TryGetValue(propertyName, out value) ? value as string : null;
             if (string.IsNullOrWhiteSpace(result))
             {
-                throw new ArgumentException("必要な指定がありません: " + propertyName);
+                throw new ArgumentException("Missing required field: " + propertyName);
             }
             return result;
         }
@@ -939,7 +939,7 @@ namespace Xfer
             object value;
             if (!body.TryGetValue(propertyName, out value) || value == null)
             {
-                throw new ArgumentException("必要な指定がありません: " + propertyName);
+                throw new ArgumentException("Missing required field: " + propertyName);
             }
 
             try
@@ -951,7 +951,7 @@ namespace Xfer
             catch (Exception exception)
             {
                 throw new ArgumentException(
-                    "数値の指定が正しくありません: " + propertyName,
+                    "Invalid numeric value: " + propertyName,
                     exception);
             }
         }

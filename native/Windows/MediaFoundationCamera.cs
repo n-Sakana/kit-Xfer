@@ -143,15 +143,15 @@ namespace Xfer
                 Check(EnumDevices(&devices, &count), "MFEnumDeviceSources");
                 try
                 {
-                    if (count == 0) throw new CameraException("カメラが見つかりません。");
+                    if (count == 0) throw new CameraException("No camera was found.");
                     uint pick = 0;
                     for (uint i = 0; i < count; i++) if (_id.Length > 0 && ReadString(devices[i], ref MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK) == _id) pick = i;
                     _name = ReadString(devices[pick], ref MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME);
                     Guid iid = IID_IMFMediaSource;
                     int hr = ((delegate* unmanaged[Stdcall]<void*, Guid*, void**, int>)V(devices[pick])[33])(devices[pick], &iid, &source); // IMFActivate::ActivateObject
                     if (hr < 0) Diagnostics.Event("camera.mf.activate.failed", "native", new { Code = hr });
-                    if (hr == unchecked((int)0x80070005)) throw new CameraException("カメラを使う許可がありません。Windows の設定の「プライバシーとセキュリティ」>「カメラ」で、デスクトップ アプリにカメラの使用を許可してください。");
-                    if (hr == unchecked((int)0xC00D3704) || hr == unchecked((int)0x800700AA)) throw new CameraException("カメラを開けません。ほかのアプリが使っていないか確かめてください。");
+                    if (hr == unchecked((int)0x80070005)) throw new CameraException("Camera access is denied. In Windows Settings, open Privacy & security > Camera and allow desktop apps to access the camera.");
+                    if (hr == unchecked((int)0xC00D3704) || hr == unchecked((int)0x800700AA)) throw new CameraException("Could not open the camera. Check whether another app is using it.");
                     Check(hr, "ActivateObject");
                     lock (_controlGate)
                     {
@@ -173,16 +173,16 @@ namespace Xfer
                     uint stream, flags; long time; void* sample = null;
                     int hr = ((delegate* unmanaged[Stdcall]<void*, uint, uint, uint*, uint*, long*, void**, int>)V(reader)[9])(reader, FIRST_VIDEO_STREAM, 0, &stream, &flags, &time, &sample); // ReadSample
                     if (hr < 0 || (flags & 3) != 0) Diagnostics.Event("camera.mf.read.failed", "native", new { Code = hr, Flags = flags });
-                    if (hr < 0) throw new CameraException(hr == unchecked((int)0xC00D3EA2) || hr == unchecked((int)0x80070491) ? "カメラが外れました。" : "カメラの映像を読めません (0x" + hr.ToString("x8") + ")。");
-                    if ((flags & 0x2) != 0) throw new CameraException("カメラの映像が終わりました。"); // END OF STREAM
-                    if ((flags & 0x1) != 0) throw new CameraException("カメラでエラーが起きました。");
+                    if (hr < 0) throw new CameraException(hr == unchecked((int)0xC00D3EA2) || hr == unchecked((int)0x80070491) ? "The camera was disconnected." : "Could not read a camera frame (0x" + hr.ToString("x8") + ").");
+                    if ((flags & 0x2) != 0) throw new CameraException("The camera stream ended."); // END OF STREAM
+                    if ((flags & 0x1) != 0) throw new CameraException("A camera error occurred.");
                     if (sample == null) continue;
                     try { var pixels = Copy(sample); if (pixels != null && !_stop) deliver(pixels, _width, _height); }
                     finally { Release(sample); }
                 }
             }
             catch (CameraException error) { Diagnostics.Failure("camera.mf", "native", error); _error = error.Message; }
-            catch (Exception error) { Diagnostics.Failure("camera.mf", "native", error); _error = "カメラを使えません: " + error.Message; }
+            catch (Exception error) { Diagnostics.Failure("camera.mf", "native", error); _error = "Camera unavailable: " + error.Message; }
             finally
             {
                 // Restore our temporary hold before a laboratory hook restores its original settings.
@@ -252,7 +252,7 @@ namespace Xfer
                 _fps = GetUInt64(current, ref MF_MT_FRAME_RATE, out rate) >= 0 && (uint)(rate & 0xffffffff) != 0 ? (double)(uint)(rate >> 32) / (uint)(rate & 0xffffffff) : bfps;
             }
             finally { Release(current); }
-            if (_width <= 0 || _height <= 0) throw new CameraException("カメラの解像度を決められません。");
+            if (_width <= 0 || _height <= 0) throw new CameraException("Could not select a camera resolution.");
             if (RequireExactFormat && (_width != _wantedWidth || (RequestedHeight > 0 && _height != RequestedHeight) || Math.Abs(_fps - _wantedFps) > 0.05))
                 throw new CameraException("Camera output differs from the requested resolution/fps.");
         }
@@ -411,7 +411,7 @@ namespace Xfer
             if (hr < 0) {
                 // 'what' is a fixed API name at each call site, never driver-provided text.
                 Diagnostics.Event("camera.mf.api.failed", what, new { Code = hr });
-                throw new CameraException("カメラを使えません (" + what + " 0x" + hr.ToString("x8") + ")。");
+                throw new CameraException("Camera unavailable (" + what + " 0x" + hr.ToString("x8") + ").");
             }
         }
 

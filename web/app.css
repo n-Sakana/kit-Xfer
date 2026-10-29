@@ -51,7 +51,7 @@ h1, h2, p, ul { margin: 0; }
 .skip-link { position: absolute; left: 12px; top: -48px; z-index: 100; padding: 8px 12px; border-radius: 8px; background: var(--surface); color: var(--ink); }
 .skip-link:focus { top: 8px; }
 
-/* What shows depends on who opened the page (a phone, or this PC's browser) and on 送る / 受け取る. */
+/* Visibility depends on the connection role and send/receive view. */
 .app[data-role="remote"] .local-only, .app[data-role="loading"] .local-only { display: none; }
 .app[data-role="local"] .remote-picker { display: none; }
 .app[data-view="send"] .receive-only, .app[data-view="receive"] .send-only { display: none; }

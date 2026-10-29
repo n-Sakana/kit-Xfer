@@ -50,7 +50,7 @@ namespace Xfer
         {
             if (string.IsNullOrWhiteSpace(path))
             {
-                throw new ArgumentException("選ぶファイルまたはフォルダが指定されていません。", "path");
+                throw new ArgumentException("No file or folder was specified.", "path");
             }
 
             var fullPath = Path.GetFullPath(path);
@@ -93,7 +93,7 @@ namespace Xfer
         {
             if (mode != "optical")
             {
-                throw new ArgumentException("選択の種類が正しくありません。", "mode");
+                throw new ArgumentException("Invalid selection mode.", "mode");
             }
             return mode;
         }

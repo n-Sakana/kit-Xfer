@@ -471,7 +471,6 @@ namespace Xfer
                 var start = _position;
                 if (Take('-'))
                 {
-                    // Sign consumed.
                 }
 
                 if (Take('0'))
@@ -492,7 +491,6 @@ namespace Xfer
                 {
                     if (Take('+') || Take('-'))
                     {
-                        // Exponent sign consumed.
                     }
 
                     RequireDigits();

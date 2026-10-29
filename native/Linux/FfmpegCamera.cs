@@ -23,7 +23,7 @@ namespace Xfer
 
         public FfmpegCamera(string device, int width, int fps)
         {
-            if (device == null || !Regex.IsMatch(device, @"^/dev/video[0-9]+$")) throw new ArgumentException("カメラは /dev/videoN で指定してください。");
+            if (device == null || !Regex.IsMatch(device, @"^/dev/video[0-9]+$")) throw new ArgumentException("Specify the camera as /dev/videoN.");
             _device = device; _fps = fps;
             _focus = new V4l2FocusControl(device);
             Width = width; Height = width * 9 / 16;
@@ -58,7 +58,7 @@ namespace Xfer
                 "-video_size", size, "-i", _device, "-an", "-vf", fit, "-pix_fmt", "bgra", "-f", "rawvideo", "pipe:1" })
                 info.ArgumentList.Add(arg);
             try { _process = Process.Start(info); }
-            catch (Exception error) { Diagnostics.Failure("camera.ffmpeg.start", "native", error); throw new InvalidOperationException("ffmpeg を起動できません。ffmpeg が入っているか確かめてください。"); }
+            catch (Exception error) { Diagnostics.Failure("camera.ffmpeg.start", "native", error); throw new InvalidOperationException("Could not start ffmpeg. Check that it is installed."); }
             _clock.Start();
             _errors = new Thread(ReadErrors) { IsBackground = true, Name = "Xfer camera errors" };
             _errors.Start();
@@ -92,7 +92,7 @@ namespace Xfer
                 try { _process.WaitForExit(1000); } catch (Exception) { }
                 string tail;
                 lock (_gate) tail = _errorTail.Trim();
-                lock (_gate) _error = "カメラの映像が止まりました。カメラと撮影幅・fps を確かめてください。" + (tail.Length > 0 ? " (" + tail + ")" : "");
+                lock (_gate) _error = "The camera stopped delivering frames. Check the camera, capture width, and frame rate." + (tail.Length > 0 ? " (" + tail + ")" : "");
             }
             finally { _focus.Dispose(); }
         }

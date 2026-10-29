@@ -45,7 +45,7 @@ namespace Xfer
                 catch (SocketException) { }
             }
             Console.WriteLine("PASS native shutdown drains last event and aggregate after an occupied writer gate, stops owned server, runs once and bounds caller wait");
-            Console.WriteLine("Managed Linux check only; Windows Native AOT/PowerShell boundary requires its reserved verification slot.");
+            Console.WriteLine("This managed test does not cover the Windows Native AOT/PowerShell boundary.");
             return 0;
         }
     }

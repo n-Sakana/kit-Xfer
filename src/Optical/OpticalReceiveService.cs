@@ -136,7 +136,7 @@ namespace Xfer
                 if (!_receivers.TryGetValue(receiverId, out state))
                 {
                     if (_receivers.Count + _streams.Count >= 16)
-                        throw new ArgumentException("受信画面が多すぎます。不要なカメラを停止してください。");
+                        throw new ArgumentException("Too many receivers are active. Stop an unused camera.");
                     state = new OpticalReceiveState(frame);
                     _receivers[receiverId] = state;
                     Diagnostics.Event("receive.session", state.TransferId, new { Receiver = Diagnostics.Id(receiverId) });
@@ -193,7 +193,7 @@ namespace Xfer
                     if (Fnv1a(payload) != frame.PayloadFnv)
                     {
                         throw new InvalidDataException(
-                            "受信した光学転送の検算に失敗しました。もう一度読み取ってください。");
+                            "Transfer verification failed. Scan the transfer again.");
                     }
 
                     Diagnostics.Event("receive.verify.fnv.ok", state.TransferId, null);
@@ -250,7 +250,7 @@ namespace Xfer
             }
             if (state == null)
             {
-                if (_streams.Count + _receivers.Count >= 16) throw new ArgumentException("受信画面が多すぎます。");
+                if (_streams.Count + _receivers.Count >= 16) throw new ArgumentException("Too many receivers are active.");
                 state = new StreamingReceiver(frame, _outputRoot); _streams.Add(receiverId, state);
                 Diagnostics.Event("receive.session", state.Id, new { Receiver = Diagnostics.Id(receiverId), Streaming = true });
             }
@@ -294,7 +294,7 @@ namespace Xfer
         {
             if (string.IsNullOrWhiteSpace(value) || value.Length > 100)
             {
-                throw new ArgumentException("受信画面を識別できません。", "receiverId");
+                throw new ArgumentException("The receiver could not be identified.", "receiverId");
             }
             return value;
         }
@@ -490,11 +490,10 @@ namespace Xfer
     {
         private const int HeaderLength = 20;
         private const int MaximumBlockLength = 2933;
-        /// <summary>Blocks one transfer may have: 64 MiB in FX2's smallest frames, with room to spare.</summary>
+        /// <summary>Maximum block count accepted by the buffered D1/0C receiver.</summary>
         public const int MaximumBlocks = 1 << 20;
-        // Xfer wraps as much as 64 MiB of file content in a DCB1 manifest and
-        // then in the upstream DCF2 envelope. Keep the content limit at 64 MiB,
-        // while allowing the protected stream to carry that bounded metadata.
+        // Bound D1/0C decoding to 64 MiB of content plus DCB1 manifest and DCF2 envelope
+        // overhead. The disk-backed D1/0D format is parsed separately.
         private const int MaximumPayloadLength =
             (64 * 1024 * 1024) + (1024 * 1024) + (64 * 1024);
 
@@ -674,7 +673,7 @@ namespace Xfer
         {
             if (!IsComplete)
             {
-                throw new InvalidOperationException("光学転送はまだ揃っていません。");
+                throw new InvalidOperationException("The transfer is not complete.");
             }
 
             var result = new byte[_totalLength];
@@ -737,7 +736,7 @@ namespace Xfer
         {
             if (block == null || block.Length != _blockLength)
             {
-                throw new ArgumentException("光学転送のブロック長が一致しません。", "block");
+                throw new ArgumentException("Transfer block lengths do not match.", "block");
             }
             var words = new uint[_words];
             for (var index = 0; index < block.Length; index++)
@@ -761,7 +760,7 @@ namespace Xfer
             {
                 return value;
             }
-            throw new InvalidOperationException("復元するブロックがありません。");
+            throw new InvalidOperationException("There are no blocks to reconstruct.");
         }
 
         private sealed class PendingFountainFrame
@@ -810,7 +809,7 @@ namespace Xfer
             Diagnostics.Event("receive.verify.container.ok", transferId, new { Ms = Diagnostics.Milliseconds(stamp) });
             if (!string.Equals(mediaType, BundleMediaType, StringComparison.Ordinal))
             {
-                throw new InvalidDataException("受信した内容は Xfer のフォルダ転送ではありません。");
+                throw new InvalidDataException("The received data is not an Xfer folder transfer.");
             }
 
             Diagnostics.Event("receive.verify.bundle.start", transferId, null);
@@ -832,7 +831,7 @@ namespace Xfer
                     : StringComparison.Ordinal;
                 if (!target.StartsWith(prefix, comparison))
                 {
-                    throw new InvalidDataException("受信したファイルの保存先が不正です。");
+                    throw new InvalidDataException("Invalid destination path in the received transfer.");
                 }
 
                 var parent = Path.GetDirectoryName(target);
@@ -859,7 +858,7 @@ namespace Xfer
                 || container[2] != 0x46
                 || container[3] != 0x32)
             {
-                throw new InvalidDataException("受信したファイルヘッダーが不正です。");
+                throw new InvalidDataException("Invalid received file header.");
             }
 
             var compression = container[4];
@@ -873,7 +872,7 @@ namespace Xfer
                 || transmittedLengthRaw == 0
                 || transmittedLengthRaw > MaximumContainerBytes)
             {
-                throw new InvalidDataException("受信したファイル長が不正です。");
+                throw new InvalidDataException("Invalid received file length.");
             }
 
             var originalLength = (int)originalLengthRaw;
@@ -882,7 +881,7 @@ namespace Xfer
             if (bodyOffset > container.Length
                 || container.Length - bodyOffset != transmittedLength)
             {
-                throw new InvalidDataException("受信したファイルが途中で切れています。");
+                throw new InvalidDataException("The received file is truncated.");
             }
 
             try
@@ -895,7 +894,7 @@ namespace Xfer
             }
             catch (DecoderFallbackException exception)
             {
-                throw new InvalidDataException("受信したファイル情報を読めません。", exception);
+                throw new InvalidDataException("Could not read the received file metadata.", exception);
             }
 
             var transmitted = new byte[transmittedLength];
@@ -907,7 +906,7 @@ namespace Xfer
             Diagnostics.Event("receive.decompress.ok", transferId, new { Bytes = bytes.Length });
             if (bytes.Length != originalLength)
             {
-                throw new InvalidDataException("受信したファイル長がヘッダーと一致しません。");
+                throw new InvalidDataException("The received file length does not match its header.");
             }
 
             var expectedHash = new byte[32];
@@ -915,7 +914,7 @@ namespace Xfer
             var actualHash = Sha256(bytes);
             if (!EqualBytes(expectedHash, actualHash))
             {
-                throw new InvalidDataException("受信したファイルの SHA-256 検算に失敗しました。");
+                throw new InvalidDataException("SHA-256 verification failed for the received file.");
             }
             return bytes;
         }
@@ -928,18 +927,18 @@ namespace Xfer
                 || bytes[2] != 0x42
                 || bytes[3] != 0x31)
             {
-                throw new InvalidDataException("受信したフォルダ情報が不正です。");
+                throw new InvalidDataException("Invalid received folder metadata.");
             }
 
             var manifestLengthRaw = ReadUInt32(bytes, 4);
             if (manifestLengthRaw == 0 || manifestLengthRaw > MaximumManifestBytes)
             {
-                throw new InvalidDataException("受信したファイル一覧の長さが不正です。");
+                throw new InvalidDataException("Invalid received manifest length.");
             }
             var manifestLength = (int)manifestLengthRaw;
             if (BundleHeaderLength + manifestLength > bytes.Length)
             {
-                throw new InvalidDataException("受信したファイル一覧が途中で切れています。");
+                throw new InvalidDataException("The received manifest is truncated.");
             }
 
             var manifestBytes = new byte[manifestLength];
@@ -951,17 +950,17 @@ namespace Xfer
             }
             catch (ArgumentException exception)
             {
-                throw new InvalidDataException("受信したファイル一覧を読めません。", exception);
+                throw new InvalidDataException("Could not read the received manifest.", exception);
             }
 
             if (ReadInteger(manifest, "v", 1) != 1)
             {
-                throw new InvalidDataException("この Xfer では扱えない転送形式です。");
+                throw new InvalidDataException("This version of Xfer does not support the transfer format.");
             }
             var label = ReadString(manifest, "label");
             if (label.IndexOf('/') >= 0)
             {
-                throw new InvalidDataException("受信した転送名が不正です。");
+                throw new InvalidDataException("Invalid received transfer name.");
             }
             OpticalPayload.ValidateEntryName(label);
 
@@ -971,11 +970,11 @@ namespace Xfer
                 : null;
             if (rawFiles == null || rawFiles.Count == 0 || rawFiles.Count > MaximumFiles)
             {
-                throw new InvalidDataException("受信したファイル数が不正です。");
+                throw new InvalidDataException("Invalid received file count.");
             }
             if (ReadInteger(manifest, "count", MaximumFiles) != rawFiles.Count)
             {
-                throw new InvalidDataException("受信したファイル数が一覧と一致しません。");
+                throw new InvalidDataException("The received file count does not match the manifest.");
             }
             var declaredTotal = ReadInteger(manifest, "totalSize", MaximumPayloadBytes);
 
@@ -987,38 +986,38 @@ namespace Xfer
                 var item = raw as Dictionary<string, object>;
                 if (item == null)
                 {
-                    throw new InvalidDataException("受信したファイル一覧が壊れています。");
+                    throw new InvalidDataException("The received manifest is corrupt.");
                 }
                 var path = ReadString(item, "path");
                 OpticalPayload.ValidateEntryName(path);
                 if (!paths.Add(path))
                 {
-                    throw new InvalidDataException("受信した一覧に同じファイル名が重複しています。");
+                    throw new InvalidDataException("The received manifest contains duplicate file names.");
                 }
                 var size = ReadInteger(item, "size", MaximumPayloadBytes);
                 var hash = ReadString(item, "sha256");
                 if (!IsSha256(hash))
                 {
-                    throw new InvalidDataException("受信したファイルのハッシュ値が不正です。");
+                    throw new InvalidDataException("Invalid received file hash.");
                 }
                 measuredTotal = checked(measuredTotal + size);
                 if (measuredTotal > MaximumPayloadBytes)
                 {
-                    throw new InvalidDataException("受信したフォルダが大きすぎます。");
+                    throw new InvalidDataException("The received folder is too large.");
                 }
                 records.Add(new OpticalBundleRecord(path, size, hash));
             }
 
             if (measuredTotal != declaredTotal)
             {
-                throw new InvalidDataException("受信した合計サイズが一覧と一致しません。");
+                throw new InvalidDataException("The received total size does not match the manifest.");
             }
             ValidatePathSet(paths);
 
             var bodyOffset = BundleHeaderLength + manifestLength;
             if (bytes.Length - bodyOffset != declaredTotal)
             {
-                throw new InvalidDataException("受信したフォルダの長さが一覧と一致しません。");
+                throw new InvalidDataException("The received folder length does not match the manifest.");
             }
 
             var entries = new List<ReceivedOpticalFile>();
@@ -1034,7 +1033,7 @@ namespace Xfer
                     StringComparison.Ordinal))
                 {
                     throw new InvalidDataException(
-                        string.Format("受信したファイルが壊れています: {0}", record.Path));
+                        string.Format("The received file is corrupt: {0}", record.Path));
                 }
                 entries.Add(new ReceivedOpticalFile(record.Path, content));
             }
@@ -1057,7 +1056,7 @@ namespace Xfer
                     }
                     if (output.Length + read > expectedLength)
                     {
-                        throw new InvalidDataException("受信した圧縮データが宣言サイズを超えました。");
+                        throw new InvalidDataException("The decompressed data exceeds the declared size.");
                     }
                     output.Write(buffer, 0, read);
                 }
@@ -1073,7 +1072,7 @@ namespace Xfer
             object raw;
             if (!values.TryGetValue(name, out raw) || raw == null)
             {
-                throw new InvalidDataException("受信した一覧に必要な数値がありません: " + name);
+                throw new InvalidDataException("Missing numeric field in the received manifest: " + name);
             }
             decimal value;
             try
@@ -1082,11 +1081,11 @@ namespace Xfer
             }
             catch (Exception exception)
             {
-                throw new InvalidDataException("受信した一覧の数値が不正です: " + name, exception);
+                throw new InvalidDataException("Invalid numeric field in the received manifest: " + name, exception);
             }
             if (value < 0 || value > maximum || decimal.Truncate(value) != value)
             {
-                throw new InvalidDataException("受信した一覧の数値が不正です: " + name);
+                throw new InvalidDataException("Invalid numeric field in the received manifest: " + name);
             }
             return (int)value;
         }
@@ -1097,7 +1096,7 @@ namespace Xfer
             var value = values.TryGetValue(name, out raw) ? raw as string : null;
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new InvalidDataException("受信した一覧に必要な文字列がありません: " + name);
+                throw new InvalidDataException("Missing text field in the received manifest: " + name);
             }
             return value;
         }
@@ -1112,7 +1111,7 @@ namespace Xfer
                     if (paths.Contains(path.Substring(0, slash)))
                     {
                         throw new InvalidDataException(
-                            "受信した一覧で同じ名前がファイルとフォルダに使われています。");
+                            "A path in the received manifest is used as both a file and a folder.");
                     }
                     slash = path.IndexOf('/', slash + 1);
                 }

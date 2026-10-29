@@ -136,9 +136,8 @@ function Invoke-XferWindow {
         }
     }
 
-    # Windows PowerShell does not load a .NET assembly marked as downloaded (Mark of the Web, as in a copy
-    # extracted from a downloaded zip). As the previous launcher did for WebView2, Xfer then uses its own
-    # copy of the two MiniUI files without the mark.
+    # Windows PowerShell can block assemblies carrying Mark of the Web. Load a private copy
+    # without that mark when the distribution was extracted from a downloaded ZIP.
     $bridge = Join-Path $runtime 'MiniUI.Bridge.dll'
     $zone = 0
     try { $zone = [int][Security.Policy.Zone]::CreateFromUrl('file://' + $bridge).SecurityZone } catch { }
@@ -165,7 +164,7 @@ function Invoke-XferWindow {
         return [MiniUI.Bridge]::Run((Join-Path $ui 'index.html'), $json)
     }
     finally {
-        # Precompiled with the distribution. Do not add compilation to ordinary startup or exit.
+        # The precompiled bridge calls native cleanup before the host exits.
         try {
             $shutdownBridge = Join-Path $runtime 'Xfer.Launcher.dll'
             if (Test-Path -LiteralPath $shutdownBridge -PathType Leaf) {

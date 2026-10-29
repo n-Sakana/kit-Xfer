@@ -33,11 +33,9 @@ namespace Xfer
         public bool Cli { get; private set; }
         public string InitialPath { get; private set; }
         public string InitialMode { get; private set; }
-        /// <summary>Measurement start-up (--send): show the QR for --path at once, with these settings. Null in
-        /// normal use, where the window starts on the file list.</summary>
+        /// <summary>--send overrides, or null when starting on the file list.</summary>
         public AutoSendOptions AutoSend { get; private set; }
-        /// <summary>Measurement start-up (--receive): open the receive view and start reading with the camera
-        /// settings given here (the saved ones otherwise). Null in normal use.</summary>
+        /// <summary>--receive overrides, or null when starting normally.</summary>
         public AutoReceiveOptions AutoReceive { get; private set; }
 
         public static AppOptions Parse(string[] args)
@@ -236,14 +234,14 @@ namespace Xfer
             writer.WriteLine("  --no-browser                Run the HTTP server without the desktop window");
             writer.WriteLine("  --help                      Show this help");
             writer.WriteLine();
-            writer.WriteLine("Measurement (desktop window only): show the QR for --path at once");
-            writer.WriteLine("  --send                      Start showing the QR without the file list");
-            writer.WriteLine("  --fps <n>                   10, 15, 20, 24, 30 or 60 (the saved setting otherwise)");
+            writer.WriteLine("Desktop sending: start displaying --path immediately");
+            writer.WriteLine("  --send                      Start sending without the file list");
+            writer.WriteLine("  --fps <n>                   10, 15, 20, 24, 30 or 60 (otherwise use the saved setting)");
             writer.WriteLine("  --frame-bytes <n>           500, 1000, 1465, 1850, 2331 or 2953");
             writer.WriteLine("  --ec <L|M|Q|H>              Error correction");
             writer.WriteLine("  --qr-size <px>              Size of one QR on screen (300-1200)");
-            writer.WriteLine("  --columns <n>               QRs side by side (1-3)");
-            writer.WriteLine("  --rows <n>                  Rows of QRs (1-2)");
+            writer.WriteLine("  --columns <n>               QR codes per row (1-3)");
+            writer.WriteLine("  --rows <n>                  Rows of QR codes (1-2)");
             writer.WriteLine("  --color / --mono            Tile chroma layer on / off");
             writer.WriteLine("  --layout <qr|fx2>           QR codes, or Tile (fx2): cells over the whole window");
             writer.WriteLine("  --cell <px>                 Tile cell size in device pixels (1-32)");
@@ -251,10 +249,10 @@ namespace Xfer
             writer.WriteLine("  --keystone-x <percent>      Draw the picture as a trapezoid: right edge shorter (-: left)");
             writer.WriteLine("  --keystone-y <percent>      Draw the picture as a trapezoid: top edge narrower (-: bottom)");
             writer.WriteLine();
-            writer.WriteLine("Measurement (desktop window only): start reading with this PC's camera at once");
+            writer.WriteLine("Desktop receiving: start the camera immediately");
             writer.WriteLine("  --receive                   Open the receive view and start the camera");
-            writer.WriteLine("  --camera <name>             The camera whose name contains this (the saved one otherwise)");
-            writer.WriteLine("  --camera-width <px>         960, 1280 or 1920 (the saved setting otherwise)");
+            writer.WriteLine("  --camera <name>             Match part of a camera name; otherwise use the saved device");
+            writer.WriteLine("  --camera-width <px>         960, 1280 or 1920 (otherwise use the saved setting)");
             writer.WriteLine("  --camera-fps <n>            30 or 60");
             writer.WriteLine("  --workers <n>               Reading threads (1-3)");
         }

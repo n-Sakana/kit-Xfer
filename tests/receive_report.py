@@ -1,4 +1,4 @@
-"""Summarise receptions from Xfer diagnostic traces (trace-*.jsonl), for before/after comparisons.
+"""Summarize receptions from Xfer diagnostic traces (trace-*.jsonl).
 
 python tests/receive_report.py TRACE_OR_FOLDER [...] [--table]
 
@@ -6,7 +6,7 @@ For each camera start in a trace: seconds from camera start to receive.complete 
 first frame of the session, the transmitted payload (from the transfer's correlation key) per second, pictures
 captured, pictures read (QR codes or FX2 pictures), new and duplicate fountain frames, and stalls. The trace keeps
 5-second aggregates, so stalls are counted on them: a 5-second bucket with at most 5 new frames is low, and low
-buckets in a row lasting 10 s or more make one stall (the definition used for the QR receptions of 2026-10-20).
+buckets in a row lasting 10 s or more count as one stall.
 --table prints the 5-second buckets.
 """
 from __future__ import annotations

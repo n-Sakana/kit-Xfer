@@ -7,7 +7,7 @@ using System.Text;
 namespace Xfer
 {
     // D1/0D: bounded fountain windows over a seekable, 64-bit virtual bundle.
-    // All integers are little endian. See docs/streaming-optical.md for the wire format.
+    // All integers are little endian. See docs/optical-format.md for the wire format.
     internal static class StreamingWire
     {
         public const int Header = 48, ChunkBytes = 65536;
@@ -65,7 +65,7 @@ namespace Xfer
         {
             var info = new FileInfo(file.FullPath);
             if (info.Length != file.Size || info.LastWriteTimeUtc != file.ModifiedUtc.UtcDateTime)
-                throw new IOException("送信中にファイルが変更されました: " + file.Name);
+                throw new IOException("A file changed during transfer: " + file.Name);
         }
         public byte[] Read(long offset, int count)
         {
@@ -221,7 +221,7 @@ namespace Xfer
                 w = Load(f); _windows.Add(f.Chunk, w);
             }
             w.Used = ++_clock;
-            if (w.Hash != f.Hash) throw new InvalidDataException("受信した区画の検算値が変わりました。");
+            if (w.Hash != f.Hash) throw new InvalidDataException("The received segment checksum changed.");
             if (w.Complete) { _duplicates++; return Progress(); }
             int before = w.Decoder.SolvedCount;
             int duplicates = w.Decoder.FramesDuplicate;
@@ -236,7 +236,7 @@ namespace Xfer
             if (w.Decoder.IsComplete)
             {
                 var bytes = w.Decoder.Assemble();
-                if (StreamingWire.Hash(bytes) != w.Hash) throw new InvalidDataException("受信した区画の検算に失敗しました。");
+                if (StreamingWire.Hash(bytes) != w.Hash) throw new InvalidDataException("Received segment verification failed.");
                 _data.Position = w.Chunk * StreamingWire.ChunkBytes; _data.Write(bytes, 0, bytes.Length);
                 w.Complete = true; w.Decoder = null; _done++; Persist(w);
             }
@@ -259,7 +259,7 @@ namespace Xfer
             if (flag > 0)
             {
                 var h = new byte[4]; StreamingWire.ReadExactly(_map, h, 0, 4);
-                if (BitConverter.ToUInt32(h, 0) != f.Hash) throw new InvalidDataException("受信した区画が一致しません。");
+                if (BitConverter.ToUInt32(h, 0) != f.Hash) throw new InvalidDataException("The received segment does not match.");
                 if (flag == 2) { w.Complete = true; return w; }
             }
             w.Decoder = new FountainDecoder(w.Blocks, _block, _session, w.Length);
@@ -311,8 +311,8 @@ namespace Xfer
         {
             // BinaryWriter's 7-bit UTF-8 length, bounded per path, never by file count or total content size.
             int length = 0, shift = 0;
-            while (true) { byte b = reader.ReadByte(); if (shift >= 28) throw new InvalidDataException("名前が不正です。"); length |= (b & 127) << shift; if (b < 128) break; shift += 7; }
-            if (length <= 0 || length > 1024 * 1024) throw new InvalidDataException("名前が不正です。");
+            while (true) { byte b = reader.ReadByte(); if (shift >= 28) throw new InvalidDataException("Invalid name."); length |= (b & 127) << shift; if (b < 128) break; shift += 7; }
+            if (length <= 0 || length > 1024 * 1024) throw new InvalidDataException("Invalid name.");
             var bytes = reader.ReadBytes(length); if (bytes.Length != length) throw new EndOfStreamException();
             return new UTF8Encoding(false, true).GetString(bytes);
         }
@@ -323,16 +323,16 @@ namespace Xfer
             {
                 using (var reader = new BinaryReader(input, Encoding.UTF8, true))
                 {
-                    if (reader.ReadUInt32() != 0x33425846) throw new InvalidDataException("転送形式が不正です。");
+                    if (reader.ReadUInt32() != 0x33425846) throw new InvalidDataException("Invalid transfer format.");
                     string label = OpticalPayload.SafeLabel(ReadString(reader));
-                    long count = reader.ReadInt64(); if (count <= 0 || count > (length - input.Position) / 42) throw new InvalidDataException("ファイル数が不正です。");
+                    long count = reader.ReadInt64(); if (count <= 0 || count > (length - input.Position) / 42) throw new InvalidDataException("Invalid file count.");
                     staging = Path.Combine(root, ".xfer-save-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(staging);
                     var buffer = new byte[65536];
                     for (long i = 0; i < count; i++)
                     {
                         string name = OpticalPayload.ValidateEntryName(ReadString(reader));
                         long size = reader.ReadInt64(); byte[] expected = reader.ReadBytes(32);
-                        if (expected.Length != 32 || size < 0 || size > length - input.Position) throw new InvalidDataException("ファイルの長さが不正です。");
+                        if (expected.Length != 32 || size < 0 || size > length - input.Position) throw new InvalidDataException("Invalid file length.");
                         string target = Path.Combine(staging, name.Replace('/', Path.DirectorySeparatorChar));
                         Directory.CreateDirectory(Path.GetDirectoryName(target));
                         using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -342,10 +342,10 @@ namespace Xfer
                             while (remaining > 0)
                             { int take = (int)Math.Min(buffer.Length, remaining); StreamingWire.ReadExactly(input, buffer, 0, take); output.Write(buffer, 0, take); sha.TransformBlock(buffer, 0, take, buffer, 0); remaining -= take; }
                             sha.TransformFinalBlock(buffer, 0, 0);
-                            if (Convert.ToBase64String(expected) != Convert.ToBase64String(sha.Hash)) throw new InvalidDataException("受信したファイルが壊れています: " + name);
+                            if (Convert.ToBase64String(expected) != Convert.ToBase64String(sha.Hash)) throw new InvalidDataException("The received file is corrupt: " + name);
                         }
                     }
-                    if (input.Position != length) throw new InvalidDataException("転送の末尾が不正です。");
+                    if (input.Position != length) throw new InvalidDataException("Invalid end of transfer.");
                     string destination = OutputLayout.PublishRunDirectory(root, label, staging);
                     staging = null; return new OpticalSavedPayload(label, count, destination);
                 }

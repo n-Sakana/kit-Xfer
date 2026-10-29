@@ -42,7 +42,7 @@ namespace Xfer
             }
 
             throw new PlatformNotSupportedException(
-                "OS のフォルダ選択ダイアログはこの環境では使えません。");
+                "The system folder picker is unavailable in this environment.");
         }
 
         public static Task<List<string>> PickFilesAsync(string initialPath, string mode)
@@ -60,7 +60,7 @@ namespace Xfer
             }
 
             throw new PlatformNotSupportedException(
-                "OS のファイル選択ダイアログはこの環境では使えません。");
+                "The system file picker is unavailable in this environment.");
         }
 
         private static Task<T> RunSta<T>(Func<T> operation, string name)
@@ -98,8 +98,8 @@ namespace Xfer
                 uint options;
                 dialog.GetOptions(out options);
                 dialog.SetOptions(options | FosPickFolders | FosForceFileSystem | FosPathMustExist);
-                dialog.SetTitle("フォルダを選ぶ");
-                dialog.SetOkButtonLabel("このフォルダを選ぶ");
+                dialog.SetTitle("Choose folder");
+                dialog.SetOkButtonLabel("Select this folder");
                 SetInitialFolder(dialog, initialPath, out initialFolder);
 
                 if (owner != IntPtr.Zero)
@@ -145,7 +145,7 @@ namespace Xfer
                 dialog.SetOptions(
                     options | FosForceFileSystem | FosPathMustExist | FosFileMustExist);
                 dialog.SetTitle(FilePickerTitle(mode));
-                dialog.SetOkButtonLabel("選ぶ");
+                dialog.SetOkButtonLabel("Select");
 
                 var filter = new[]
                 {
@@ -219,7 +219,7 @@ namespace Xfer
                 {
                     "--file-selection",
                     "--directory",
-                    "--title=フォルダを選ぶ"
+                    "--title=Choose folder"
                 };
                 AddZenityInitialPath(arguments, initialPath);
                 return FirstOutputLine(RunDialog(zenity, arguments));
@@ -235,12 +235,12 @@ namespace Xfer
                         "--getexistingdirectory",
                         InitialDirectory(initialPath),
                         "--title",
-                        "フォルダを選ぶ"
+                        "Choose folder"
                     }));
             }
 
             throw new PlatformNotSupportedException(
-                "zenity または kdialog が見つかりません。");
+                "Neither zenity nor kdialog was found.");
         }
 
         private static List<string> PickLinuxFiles(string initialPath, string mode)
@@ -265,7 +265,7 @@ namespace Xfer
                 if (kdialog == null)
                 {
                     throw new PlatformNotSupportedException(
-                        "zenity または kdialog が見つかりません。");
+                        "Neither zenity nor kdialog was found.");
                 }
 
                 output = RunDialog(
@@ -317,7 +317,7 @@ namespace Xfer
             {
                 if (process == null)
                 {
-                    throw new IOException("OS の選択ダイアログを起動できませんでした。");
+                    throw new IOException("Could not open the system file picker.");
                 }
 
                 var output = process.StandardOutput.ReadToEnd();
@@ -333,7 +333,7 @@ namespace Xfer
                 }
 
                 throw new IOException(string.IsNullOrWhiteSpace(error)
-                    ? "OS の選択ダイアログが失敗しました。"
+                    ? "The system file picker failed."
                     : error.Trim());
             }
         }
@@ -375,12 +375,12 @@ namespace Xfer
 
         private static string FilePickerTitle(string mode)
         {
-            return "送るファイルを選ぶ";
+            return "Select files to send";
         }
 
         private static string FilePickerFilterName(string mode)
         {
-            return "すべてのファイル";
+            return "All files";
         }
 
         private static string FindCommand(string name)

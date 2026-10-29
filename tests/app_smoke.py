@@ -37,7 +37,7 @@ try:
         assert page.locator('[data-transfer-format]').count()==0  # the selected files are sent as they are
         with page.expect_response('**/api/optical/start') as reply:page.click('#showQr')
         transfer=reply.value.json();assert transfer['token']
-        expect(page.locator('#qrOverlay')).to_be_visible();expect(page.locator('#qrProgress')).to_contain_text('表示')
+        expect(page.locator('#qrOverlay')).to_be_visible();expect(page.locator('#qrProgress')).to_contain_text('Display')
         page.click('#closeQr');expect(page.locator('#qrOverlay')).to_be_hidden()
         assert not errors,errors
         print('PASS browser starts, renders and stops real optical QR frames; no script errors')
@@ -59,7 +59,7 @@ try:
     import threading
     class Foreign(BaseHTTPRequestHandler):
         def do_GET(self):
-            body=json.dumps(dict(status,application='File2MD',processId=os.getpid())).encode();self.send_response(200);self.end_headers();self.wfile.write(body)
+            body=json.dumps(dict(status,application='OtherApp',processId=os.getpid())).encode();self.send_response(200);self.end_headers();self.wfile.write(body)
         def log_message(self,*args):pass
     foreign=ThreadingHTTPServer(('127.0.0.1',0),Foreign);threading.Thread(target=foreign.serve_forever,daemon=True).start()
     try:

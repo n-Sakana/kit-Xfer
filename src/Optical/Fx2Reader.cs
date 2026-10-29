@@ -277,7 +277,7 @@ namespace Xfer
                 double cx = sx / sw, cy = sy / sw, e = Math.Sqrt(area[k]) / 3;
                 // A core sits in a light guard ring one cell wide: in the guard (1.8 cells from the centre across and
                 // down, 2.5 on the diagonals past the core's corners) at most one of eight directions may be dark.
-                // Data blobs rarely are ringed like that. (Radii chosen on the C920 captures of 2026-10-21.)
+                // This guard-ring test rejects most data-region blobs.
                 int dark = 0;
                 for (int k8 = 0; k8 < 8 && dark < GuardDark; k8++)
                 {

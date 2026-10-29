@@ -56,7 +56,7 @@ namespace Xfer
         {
             if (frameBytes < MinimumFrameBytes || frameBytes > MaximumFrameBytes)
             {
-                throw new ArgumentException("1 枚に載せる量が正しくありません。", "frameBytes");
+                throw new ArgumentException("Invalid bytes per frame.", "frameBytes");
             }
             if (framesPerSecond != 10
                 && framesPerSecond != 15
@@ -65,14 +65,14 @@ namespace Xfer
                 && framesPerSecond != 30
                 && framesPerSecond != 60)
             {
-                throw new ArgumentException("1 秒あたりの枚数が正しくありません。", "framesPerSecond");
+                throw new ArgumentException("Invalid frame rate.", "framesPerSecond");
             }
             if (errorCorrection != "L"
                 && errorCorrection != "M"
                 && errorCorrection != "Q"
                 && errorCorrection != "H")
             {
-                throw new ArgumentException("誤り訂正の設定が正しくありません。", "errorCorrection");
+                throw new ArgumentException("Invalid error correction level.", "errorCorrection");
             }
 
             var payload = OpticalPayload.Build(
@@ -99,7 +99,7 @@ namespace Xfer
                 if (_sessions.Count >= 4)
                 {
                     session.Dispose();
-                    throw new ArgumentException("QR 表示が多すぎます。不要な表示を閉じてください。");
+                    throw new ArgumentException("Too many QR displays are active. Close an unused display.");
                 }
                 _sessions.Add(session.Describe().Token, session);
             }
@@ -121,7 +121,7 @@ namespace Xfer
                 Files = selectedNames == null ? 0 : selectedNames.Count });
             try
             {
-                if (framesPerSecond < 1 || framesPerSecond > 60) throw new ArgumentException("1 秒あたりの枚数が正しくありません。", "framesPerSecond");
+                if (framesPerSecond < 1 || framesPerSecond > 60) throw new ArgumentException("Invalid frame rate.", "framesPerSecond");
                 var code = Fx2Code.ForLevel(Fx2Code.ParseLevel(errorCorrection));
                 var payload = OpticalPayload.Build(source, selectedNames, preparation);
                 var session = new OpticalSession(payload, code.FrameBytes + (color ? Fx2Code.ForColor(code.Level).FrameBytes - 4 : 0), framesPerSecond, errorCorrection, true);
@@ -129,7 +129,7 @@ namespace Xfer
                 {
                     if (_disposed) { session.Dispose(); throw new ObjectDisposedException("OpticalService"); }
                     PruneSessions();
-                    if (_sessions.Count >= 4) { session.Dispose(); throw new ArgumentException("QR 表示が多すぎます。不要な表示を閉じてください。"); }
+                    if (_sessions.Count >= 4) { session.Dispose(); throw new ArgumentException("Too many QR displays are active. Close an unused display."); }
                     _sessions.Add(session.Describe().Token, session);
                 }
                 Diagnostics.Event("send.ready", session.TransferId, new { Preparation = preparation, Layout = "fx2", Files = payload.FileCount,
@@ -177,7 +177,7 @@ namespace Xfer
                 return maximum;
             }
             throw new ArgumentException(
-                "選んだ内容はこの誤り訂正では光学転送1本に収まりません。ファイルを分けてください。");
+                "The selection exceeds the transfer capacity at this error correction level. Split it into smaller selections.");
         }
 
         private static bool FitsInOneStream(int payloadLength, int frameBytes)
@@ -263,7 +263,7 @@ namespace Xfer
         {
             if (count < 1 || count > 16)
             {
-                throw new ArgumentException("QR の先読み枚数が正しくありません。", "count");
+                throw new ArgumentException("Invalid QR prefetch count.", "count");
             }
             OpticalSession session;
             lock (_gate) { session = FindSession(token); }
@@ -377,7 +377,7 @@ namespace Xfer
             if (_encoder.BlockCount > (fx2 ? OpticalFrame.MaximumBlocks : ushort.MaxValue))
             {
                 throw new ArgumentException(
-                    "選んだ内容はこの設定では大きすぎます。1 枚に載せる量を増やしてください。");
+                    "The selection is too large for these settings. Increase the bytes per frame.");
             }
             _payloadFnv = Fnv1a(_payload);
             Label = payload.Label;
@@ -465,7 +465,7 @@ namespace Xfer
             return RenderRgba(qr.Matrix, QuietZone);
         }
 
-        // Local HTTP transport only; the bytes encoded in the optical QR are unchanged.
+        // HTTP bitmap transport; independent of the optical frame format.
         // FQR1 | side:u16 LE | count:u16 LE | firstSequence:u32 LE | bitmaps.
         // Each bitmap is row-major, MSB first, one black=1 bit per module, quiet zone included.
         public byte[] RenderPackedFrames(ulong sequence, int count)
@@ -500,7 +500,7 @@ namespace Xfer
         {
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new ArgumentException("QR コードにする文字列が空です。", "value");
+                throw new ArgumentException("The text to encode as a QR code is empty.", "value");
             }
 
             var expected = Encoding.UTF8.GetBytes(value);
@@ -523,7 +523,7 @@ namespace Xfer
             qr = CreateQr(frame, _errorCorrection, _qrVersion);
             if (_qrVersion > 0 && qr.Version.VersionNumber != _qrVersion)
             {
-                throw new InvalidOperationException("QR コードの版を固定できませんでした。");
+                throw new InvalidOperationException("Could not use a fixed QR version.");
             }
         }
 
@@ -551,7 +551,7 @@ namespace Xfer
             catch (WriterException exception)
             {
                 throw new ArgumentException(
-                    "この設定では QR コードに収まりません。1 枚に載せる量を減らしてください。",
+                    "The data does not fit in a QR code at these settings. Reduce the bytes per frame.",
                     exception);
             }
         }
@@ -592,7 +592,7 @@ namespace Xfer
             var segments = decoded == null ? null : decoded.ByteSegments;
             if (segments == null || segments.Count == 0)
             {
-                throw new InvalidOperationException("作った QR コードを検算できませんでした。");
+                throw new InvalidOperationException("Could not verify the generated QR code.");
             }
 
             var actualLength = 0;
@@ -602,7 +602,7 @@ namespace Xfer
             }
             if (actualLength != expected.Length)
             {
-                throw new InvalidOperationException("QR コードの検算で長さが一致しませんでした。");
+                throw new InvalidOperationException("QR verification failed: length mismatch.");
             }
 
             var offset = 0;
@@ -612,7 +612,7 @@ namespace Xfer
                 {
                     if (segment[index] != expected[offset++])
                     {
-                        throw new InvalidOperationException("QR コードの検算で内容が一致しませんでした。");
+                        throw new InvalidOperationException("QR verification failed: content mismatch.");
                     }
                 }
             }
@@ -626,7 +626,7 @@ namespace Xfer
             builder.Append(side.ToString(CultureInfo.InvariantCulture));
             builder.Append(' ');
             builder.Append(side.ToString(CultureInfo.InvariantCulture));
-            builder.Append("\" shape-rendering=\"crispEdges\" role=\"img\" aria-label=\"光学転送 QR\">");
+            builder.Append("\" shape-rendering=\"crispEdges\" role=\"img\" aria-label=\"Transfer QR code\">");
             builder.Append("<rect width=\"100%\" height=\"100%\" fill=\"#fff\"/><path fill=\"#000\" d=\"");
 
             for (var y = 0; y < matrix.Height; y++)
@@ -747,7 +747,7 @@ namespace Xfer
         {
             if (payload == null || payload.Length == 0)
             {
-                throw new ArgumentException("送る内容が空です。", "payload");
+                throw new ArgumentException("The transfer payload is empty.", "payload");
             }
             if (blockLength <= 0)
             {
@@ -999,12 +999,12 @@ namespace Xfer
             }
             if (selectedNames == null || selectedNames.Count == 0)
             {
-                throw new ArgumentException("送るファイルを1つ以上選んでください。", "selectedNames");
+                throw new ArgumentException("Select at least one file to send.", "selectedNames");
             }
 
             var selected = Resolve(source, selectedNames);
-            // This is a format/memory threshold, not a transfer limit. Keep the small-transfer wire bytes
-            // and compression unchanged; larger selections use a bounded, disk-backed receiver.
+            // Small selections use compressed bundles; larger selections use a disk-backed receiver.
+            // These thresholds select a format rather than limit transfer size.
             long measured = 0, metadata = 0;
             foreach (var file in selected) { measured = checked(measured + file.Size); metadata += Encoding.UTF8.GetByteCount(file.Name) + 160L; }
             if (measured > 8 * 1024 * 1024 || metadata > 512 * 1024 || selected.Count > 2000)
@@ -1023,14 +1023,14 @@ namespace Xfer
                 using (var input = File.OpenRead(file.FullPath))
                 {
                     if (input.Length != file.Size || input.Length > 8 * 1024 * 1024 - total)
-                        throw new IOException("準備中にファイルが変更されました。");
+                        throw new IOException("A file changed during transfer preparation.");
                     bytes = new byte[(int)input.Length];
                     StreamingWire.ReadExactly(input, bytes, 0, bytes.Length);
-                    if (input.ReadByte() != -1) throw new IOException("準備中にファイルが変更されました。");
+                    if (input.ReadByte() != -1) throw new IOException("A file changed during transfer preparation.");
                 }
                 Diagnostics.Sample("send.read_file", preparation, Diagnostics.Milliseconds(readStamp), new { Bytes = bytes.Length });
                 total = checked(total + bytes.LongLength);
-                if (total > 8 * 1024 * 1024) throw new IOException("準備中にファイルが変更されました。");
+                if (total > 8 * 1024 * 1024) throw new IOException("A file changed during transfer preparation.");
                 contents.Add(bytes);
                 manifestFiles.Add(new Dictionary<string, object>
                 {
@@ -1055,7 +1055,7 @@ namespace Xfer
             var manifestBytes = JsonCodec.Serialize(manifest);
             if (manifestBytes.Length > 1024 * 1024)
             {
-                throw new ArgumentException("ファイル名の一覧が大きすぎます。");
+                throw new ArgumentException("The file name list is too large.");
             }
 
             var bundleLength = checked(BundleHeaderLength + manifestBytes.Length + (int)total);
@@ -1093,7 +1093,7 @@ namespace Xfer
                 if (string.IsNullOrWhiteSpace(name) || !byName.TryGetValue(name, out file))
                 {
                     throw new FileNotFoundException(
-                        string.Format("選んだファイルが見つかりません: {0}", name));
+                        string.Format("Selected file not found: {0}", name));
                 }
                 if (seen.Add(file.Name))
                 {
@@ -1185,7 +1185,7 @@ namespace Xfer
                 || (name.Length >= 2 && char.IsLetter(name[0]) && name[1] == ':'))
             {
                 throw new ArgumentException(
-                    string.Format("光学転送で扱えないファイル名です: {0}", name));
+                    string.Format("Unsupported transfer file name: {0}", name));
             }
 
             string normalized;
@@ -1200,21 +1200,21 @@ namespace Xfer
             if (!string.Equals(name, normalized, StringComparison.Ordinal))
             {
                 throw new ArgumentException(
-                    string.Format("光学転送で扱えないファイル名です: {0}", name));
+                    string.Format("Unsupported transfer file name: {0}", name));
             }
 
             var segments = name.Split('/');
             if (segments.Length > 32)
             {
                 throw new ArgumentException(
-                    string.Format("光学転送で扱えないファイル名です: {0}", name));
+                    string.Format("Unsupported transfer file name: {0}", name));
             }
             foreach (var segment in segments)
             {
                 if (!IsSafePathSegment(segment))
                 {
                     throw new ArgumentException(
-                        string.Format("光学転送で扱えないファイル名です: {0}", name));
+                        string.Format("Unsupported transfer file name: {0}", name));
                 }
             }
             return name;

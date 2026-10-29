@@ -61,9 +61,9 @@ namespace Xfer
                 Check(((delegate* unmanaged[Stdcall]<void*, uint*, int>)V(dialog)[10])(dialog, &options)); // GetOptions
                 options |= FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | (folder ? FOS_PICKFOLDERS : FOS_FILEMUSTEXIST | FOS_ALLOWMULTISELECT);
                 Check(((delegate* unmanaged[Stdcall]<void*, uint, int>)V(dialog)[9])(dialog, options)); // SetOptions
-                fixed (char* title = folder ? "フォルダを選ぶ" : "ファイルを選ぶ")
+                fixed (char* title = folder ? "Choose folder" : "Choose files")
                     ((delegate* unmanaged[Stdcall]<void*, char*, int>)V(dialog)[17])(dialog, title); // SetTitle
-                fixed (char* ok = folder ? "このフォルダを選ぶ" : "選ぶ")
+                fixed (char* ok = folder ? "Select this folder" : "Select")
                     ((delegate* unmanaged[Stdcall]<void*, char*, int>)V(dialog)[18])(dialog, ok); // SetOkButtonLabel
                 string initial = InitialFolder(initialPath);
                 if (initial != null)

@@ -45,7 +45,7 @@ namespace Xfer
                 if (layout != null && layout.Width == width && layout.Height == height && layout.CellPixels == cell && layout.Coarse == (coarse < 2 ? 0 : coarse))
                     return layout;
                 layout = Fx2Layout.Create(width, height, cell, coarse);
-                if (layout == null) throw new ArgumentException("画面が小さく、Tile の区画が 1 つも入りません。セルを小さくしてください。");
+                if (layout == null) throw new ArgumentException("No Tile patches fit in this window. Reduce the cell size.");
                 _layout = layout;
                 _ready.Clear();
                 Diagnostics.Event("send.fx2_layout", TransferId, new { Width = width, Height = height, Cell = cell, Coarse = layout.Coarse, Patches = layout.Patches,
@@ -83,7 +83,7 @@ namespace Xfer
             var picture = new Fx2Picture(layout, _code, sequence, delegate(ulong s)
             {
                 byte[] frame;
-                if (!_service.TryFrame(Token, s, out frame)) throw new InvalidOperationException("QR の表示は終了しました。");
+                if (!_service.TryFrame(Token, s, out frame)) throw new InvalidOperationException("The QR display has stopped.");
                 return frame;
             }, _color);
             Diagnostics.Sample("send.fx2_picture", TransferId, Diagnostics.Milliseconds(stamp), new { Sequence = sequence, Patches = layout.Patches });

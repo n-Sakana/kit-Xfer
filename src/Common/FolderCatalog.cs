@@ -25,7 +25,7 @@ namespace Xfer
         {
             if (paths == null || paths.Count == 0)
             {
-                throw new ArgumentException("選ぶファイルが指定されていません。", "paths");
+                throw new ArgumentException("No files were specified.", "paths");
             }
 
             var files = new List<FolderFile>();
@@ -36,7 +36,7 @@ namespace Xfer
             {
                 if (string.IsNullOrWhiteSpace(path))
                 {
-                    throw new ArgumentException("空のファイル名は選べません。", "paths");
+                    throw new ArgumentException("File names must not be empty.", "paths");
                 }
 
                 var fullPath = Path.GetFullPath(path);
@@ -60,7 +60,7 @@ namespace Xfer
                         : StringComparison.Ordinal))
                 {
                     throw new ArgumentException(
-                        "一度に選ぶファイルは同じフォルダに置かれている必要があります。",
+                        "Selected files must be in the same folder.",
                         "paths");
                 }
 

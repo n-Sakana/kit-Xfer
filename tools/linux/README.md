@@ -1,44 +1,56 @@
-# Xfer の Linux 起動
+# Linux setup
 
-NixOS では `./Xfer` が .NET SDK 9・GTK3/X11・ffmpeg 等の環境で
-Xfer のホストをビルドして起動します。MiniUI は、このリポジトリの
-`runtime/linux-x64` にあるビルド済み DLL を使います。MiniUI の repo は不要です。
-部品を更新する場合は [更新手順](../../runtime/README.md) を参照してください。
+Xfer uses the included desktop rendering libraries in `runtime/linux-x64`.
+Builds require the .NET 9 SDK. The desktop host also needs GTK 3 with X11
+support, ffmpeg, and zenity or kdialog for file selection.
 
-```bash
+On NixOS, `./Xfer` enters the environment defined in `shell.nix`, builds the
+host, and starts it:
+
+```sh
 ./Xfer --path ./input
 ```
 
-ビルドだけを行う場合は次を使います。
+To build and start separately:
 
-```bash
+```sh
 ./tools/linux/build.sh
-./Xfer.sh
+./Xfer.sh --path ./input
 ```
 
-出力は `artifacts/miniui-linux/Xfer.dll` です。画面はこのリポジトリの `ui/`（Windows と同じもの）です。
-`--path`、`--mode optical`、`--port`、`--no-browser` と、MiniUI 固有の
-`--state-dir`、`--font-dir`、`--duration-ms`、`--screenshot`、`--mcp` を利用できます。
-受け取ったファイルはリポジトリの `output` に保存します。`--output` で変えられます。
-カメラは ffmpeg で読み込みます。`Xfer_CAMERA_DEVICE=/dev/videoN` で選べます。
-既定ポートで起動するとき、Windows と同じく `tailscale serve` で HTTPS の 10000 番をこのアプリにつなぎます。
-`--port` で別のポートを指定した場合、この設定は行いません。
+The build output is `artifacts/miniui-linux/Xfer.dll`. The desktop loads
+`ui/index.html`. [Runtime components](../../runtime/README.md) lists the
+included libraries.
 
-MiniUI を使わず、ブラウザで光学転送の画面を開く場合は次を使います。
+Received files go to `output/` in the application folder. Set `--output` to
+choose another location. Set `Xfer_CAMERA_DEVICE=/dev/videoN` to select a
+V4L2 capture device explicitly.
 
-```bash
-dotnet run --project Xfer.csproj -- --no-browser
-```
+Use `--window-at X,Y` to position the window in X11 pixels, `--window WxH`
+to set its size, and `--fullscreen` to start fullscreen. With both
+`--window-at` and `--fullscreen`, fullscreen starts only after the window
+reaches the requested position, with a five-second timeout.
 
-起動時に表示される localhost URL をブラウザで開いてください。
+Host options include `--state-dir`, `--font-dir`, `--duration-ms`,
+`--screenshot`, and `--mcp`. Use isolated state and output directories for
+scripted UI tests.
 
-## アプリメニューに登録する
+## Desktop menu
 
-```bash
+```sh
 ./tools/linux/install-desktop.sh
 ```
 
-現在の配置先を埋め込んだ `Xfer.desktop` を、ユーザー用の
-`${XDG_DATA_HOME:-$HOME/.local/share}/applications` に生成します。管理者権限は不要です。
-配布物の `Xfer.desktop.in` は登録用テンプレートです。
-フォルダを移した場合は、移動先で登録コマンドを再実行してください。
+This installs `Xfer.desktop` under
+`${XDG_DATA_HOME:-$HOME/.local/share}/applications` for your account. It uses
+the current installation path. Run it again after moving the folder.
+
+## HTTP app
+
+```sh
+dotnet run --project Xfer.csproj -- --no-browser
+```
+
+Open the printed localhost URL in a browser. At the default port, Xfer uses
+Tailscale Serve on HTTPS port 10000 for phone connections. A custom `--port`
+skips Tailscale setup.

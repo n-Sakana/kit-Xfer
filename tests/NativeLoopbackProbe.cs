@@ -19,6 +19,7 @@ internal static class NativeLoopbackProbe
     public static int Main()
     {
         string root = Path.Combine(Path.GetTempPath(), "xfer-loopback-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        // Unicode paths and content verify lossless transfer across platforms.
         string source = Path.Combine(root, "送る資料"), output = Path.Combine(root, "output");
         try
         {

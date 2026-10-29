@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja" data-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <title>Xfer</title>
@@ -11,65 +11,65 @@
 <div class="app" id="app">
   <aside class="sidebar" id="sidebar">
     <div class="brand">Xfer</div>
-    <nav class="nav" aria-label="画面">
-      <button class="nav-row is-active" type="button" id="navSend" data-view="send">送る</button>
-      <button class="nav-row" type="button" id="navReceive" data-view="receive">受け取る</button>
-      <button class="nav-row" type="button" id="navPhone" data-view="phone">スマホ<span class="nav-count" id="phoneCount" hidden></span></button>
+    <nav class="nav" aria-label="Navigation">
+      <button class="nav-row is-active" type="button" id="navSend" data-view="send">Send</button>
+      <button class="nav-row" type="button" id="navReceive" data-view="receive">Receive</button>
+      <button class="nav-row" type="button" id="navPhone" data-view="phone">Phone<span class="nav-count" id="phoneCount" hidden></span></button>
     </nav>
     <div class="sidebar-foot">
-      <button class="nav-row" type="button" id="themeButton">ライトにする</button>
+      <button class="nav-row" type="button" id="themeButton">Use light theme</button>
     </div>
   </aside>
-  <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="サイドバーの幅"></div>
+  <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Sidebar width"></div>
 
   <main class="card">
-    <!-- 送る -->
+    <!-- Send -->
     <section class="view" data-panel="send">
-      <header class="card-head"><h1>送る</h1></header>
+      <header class="card-head"><h1>Send</h1></header>
       <div class="view-body">
         <div class="pane">
           <div class="toolbar">
-            <button class="btn" type="button" id="pickFiles">ファイルを選ぶ</button>
-            <button class="btn" type="button" id="pickFolder">フォルダを選ぶ</button>
+            <button class="btn" type="button" id="pickFiles">Choose files</button>
+            <button class="btn" type="button" id="pickFolder">Choose folder</button>
             <span class="path" id="sourcePath"></span>
           </div>
           <div class="table">
             <div class="thead">
-              <button class="check-cell" type="button" id="selectAll" role="checkbox" aria-checked="false" aria-label="すべて選ぶ"><span class="check"></span></button>
-              <span class="c-name">名前</span><span class="c-size">サイズ</span><span class="c-date">更新日時</span>
+              <button class="check-cell" type="button" id="selectAll" role="checkbox" aria-checked="false" aria-label="Select all"><span class="check"></span></button>
+              <span class="c-name">Name</span><span class="c-size">Size</span><span class="c-date">Modified</span>
             </div>
             <div class="tbody" id="fileList"></div>
-            <div class="empty" id="fileEmpty">ファイルかフォルダを選んでください</div>
+            <div class="empty" id="fileEmpty">Choose files or a folder</div>
           </div>
         </div>
         <div class="side">
-          <h2 class="label">送り方</h2>
-          <div class="field"><span class="field-name">表示</span>
+          <h2 class="label">Send settings</h2>
+          <div class="field"><span class="field-name">Display</span>
             <span class="seg" id="layoutGroup"><button type="button" data-layout="fx2">Tile</button><button type="button" data-layout="qr">QR</button></span></div>
           <!-- Five settings per method, in a fixed-height box. Frame rate is on the second row. -->
           <div class="methods">
             <div class="method" data-for="fx2">
-              <div class="field"><span class="field-name">セルの大きさ</span>
-                <span class="stepper"><button type="button" class="step" id="cellSmaller" aria-label="小さくする"></button><span class="step-value" id="cellValue"></span><button type="button" class="step plus" id="cellLarger" aria-label="大きくする"></button></span></div>
-              <div class="field"><span class="field-name">1 秒の枚数</span>
+              <div class="field"><span class="field-name">Cell size</span>
+                <span class="stepper"><button type="button" class="step" id="cellSmaller" aria-label="Decrease size"></button><span class="step-value" id="cellValue"></span><button type="button" class="step plus" id="cellLarger" aria-label="Increase size"></button></span></div>
+              <div class="field"><span class="field-name">Frame rate</span>
                 <button class="select" type="button" id="tileRate" data-menu="tileRate"><span class="select-value"></span><span class="chevron"></span></button></div>
-              <div class="field"><span class="field-name">色を重ねる</span><button type="button" class="switch" role="switch" id="tileColor" aria-label="色を重ねる" aria-checked="false"></button></div>
-              <div class="field"><span class="field-name">中央の粗い区画</span>
-                <span class="seg" id="coarseGroup"><button type="button" data-coarse="0">なし</button><button type="button" data-coarse="2">2 倍</button><button type="button" data-coarse="3">3 倍</button></span></div>
-              <div class="field"><span class="field-name">誤り訂正</span>
+              <div class="field"><span class="field-name">Color layer</span><button type="button" class="switch" role="switch" id="tileColor" aria-label="Color layer" aria-checked="false"></button></div>
+              <div class="field"><span class="field-name">Coarse center</span>
+                <span class="seg" id="coarseGroup"><button type="button" data-coarse="0">None</button><button type="button" data-coarse="2">2×</button><button type="button" data-coarse="3">3×</button></span></div>
+              <div class="field"><span class="field-name">Error correction</span>
                 <span class="seg" id="tileEcGroup"><button type="button" data-ec="L">L</button><button type="button" data-ec="M">M</button><button type="button" data-ec="Q">Q</button><button type="button" data-ec="H">H</button></span></div>
             </div>
             <div class="method" data-for="qr">
-              <div class="field"><span class="field-name">1 枚の量</span>
+              <div class="field"><span class="field-name">Bytes per frame</span>
                 <button class="select" type="button" id="frameBytes" data-menu="frameBytes"><span class="select-value"></span><span class="chevron"></span></button></div>
-              <div class="field"><span class="field-name">1 秒の枚数</span>
+              <div class="field"><span class="field-name">Frame rate</span>
                 <button class="select" type="button" id="frameRate" data-menu="frameRate"><span class="select-value"></span><span class="chevron"></span></button></div>
-              <div class="field"><span class="field-name">並べる枚数</span>
+              <div class="field"><span class="field-name">QR columns</span>
                 <button class="select" type="button" id="columns" data-menu="columns"><span class="select-value"></span><span class="chevron"></span></button></div>
-              <div class="field"><span class="field-name">誤り訂正</span>
+              <div class="field"><span class="field-name">Error correction</span>
                 <span class="seg" id="ecGroup"><button type="button" data-ec="L">L</button><button type="button" data-ec="M">M</button><button type="button" data-ec="Q">Q</button><button type="button" data-ec="H">H</button></span></div>
-              <div class="field"><span class="field-name">QR の大きさ</span>
-                <span class="stepper"><button type="button" class="step" id="qrSmaller" aria-label="小さくする"></button><span class="step-value" id="qrSizeValue"></span><button type="button" class="step plus" id="qrLarger" aria-label="大きくする"></button></span></div>
+              <div class="field"><span class="field-name">QR size</span>
+                <span class="stepper"><button type="button" class="step" id="qrSmaller" aria-label="Decrease size"></button><span class="step-value" id="qrSizeValue"></span><button type="button" class="step plus" id="qrLarger" aria-label="Increase size"></button></span></div>
             </div>
           </div>
         </div>
@@ -77,61 +77,61 @@
       <footer class="card-foot">
         <span class="summary" id="sendSummary"></span>
         <span class="actions">
-          <button class="btn wide" type="button" id="phoneShowQr">スマホに QR を出す</button>
-          <button class="btn primary wide" type="button" id="showQr">この画面に出す</button>
+          <button class="btn wide" type="button" id="phoneShowQr">Show QR on phone</button>
+          <button class="btn primary wide" type="button" id="showQr">Show on this screen</button>
         </span>
       </footer>
     </section>
 
-    <!-- 受け取る -->
+    <!-- Receive -->
     <section class="view" data-panel="receive" hidden>
-      <header class="card-head"><h1>受け取る</h1></header>
+      <header class="card-head"><h1>Receive</h1></header>
       <div class="view-body">
         <div class="pane">
           <div class="preview" id="preview">
             <img class="preview-image" id="previewImage" alt="">
-            <span class="preview-idle" id="previewIdle">カメラは止まっています</span>
-            <div class="hint" id="quietHint" hidden><span>送る画面が映っていません</span><button class="link" type="button" id="tipsButton">読めないとき</button></div>
+            <span class="preview-idle" id="previewIdle">Camera stopped</span>
+            <div class="hint" id="quietHint" hidden><span>No sending screen in view</span><button class="link" type="button" id="tipsButton">Troubleshooting</button></div>
           </div>
           <div class="meter">
-            <div class="meter-row"><span class="meter-state" id="receiveState">待っています</span><span class="meter-eta" id="receiveEta"></span></div>
+            <div class="meter-row"><span class="meter-state" id="receiveState">Waiting</span><span class="meter-eta" id="receiveEta"></span></div>
             <div class="bar"><span class="bar-fill" id="receiveBar"></span></div>
             <div class="meter-row sub"><span id="receiveBlocks"></span><span id="receiveRate"></span></div>
           </div>
           <div class="result" id="receiveResult" hidden>
             <span class="result-text" id="receiveResultText"></span>
-            <button class="btn" type="button" id="openReceived">フォルダを開く</button>
+            <button class="btn" type="button" id="openReceived">Open folder</button>
           </div>
         </div>
         <div class="side">
-          <h2 class="label">カメラ</h2>
-          <div class="field" id="cameraField"><span class="field-name">使うカメラ</span>
+          <h2 class="label">Camera</h2>
+          <div class="field" id="cameraField"><span class="field-name">Camera device</span>
             <button class="select" type="button" id="cameraSelect" data-menu="camera"><span class="select-value"></span><span class="chevron"></span></button></div>
-          <div class="field"><span class="field-name">撮影幅</span>
+          <div class="field"><span class="field-name">Capture width</span>
             <span class="seg" id="widthGroup"><button type="button" data-width="960">960</button><button type="button" data-width="1280">1280</button><button type="button" data-width="1920">1920</button></span></div>
-          <div class="field"><span class="field-name">撮影 fps</span>
+          <div class="field"><span class="field-name">Capture fps</span>
             <span class="seg" id="fpsGroup"><button type="button" data-fps="30">30</button><button type="button" data-fps="60">60</button></span></div>
-          <div class="field"><span class="field-name">読み取りの並列数</span>
+          <div class="field"><span class="field-name">Decode workers</span>
             <span class="seg" id="workersGroup"><button type="button" data-workers="1">1</button><button type="button" data-workers="2">2</button><button type="button" data-workers="3">3</button></span></div>
-          <h2 class="label gap">保存</h2>
-          <div class="field"><span class="field-name">終わったらフォルダを開く</span>
+          <h2 class="label gap">Save</h2>
+          <div class="field"><span class="field-name">Open folder when complete</span>
             <button class="switch" type="button" id="openWhenDone" role="switch" aria-checked="true"></button></div>
-          <div class="field column"><span class="field-name">保存先</span>
-            <span class="field-path"><span class="path" id="outputPath"></span><button class="btn small" type="button" id="openOutput">開く</button></span></div>
+          <div class="field column"><span class="field-name">Output folder</span>
+            <span class="field-path"><span class="path" id="outputPath"></span><button class="btn small" type="button" id="openOutput">Open</button></span></div>
         </div>
       </div>
       <footer class="card-foot">
         <span class="summary" id="receiveSummary"></span>
         <span class="actions">
-          <button class="btn wide" type="button" id="phoneReadCamera">スマホのカメラで読む</button>
-          <button class="btn primary wide" type="button" id="cameraButton">この PC のカメラで読む</button>
+          <button class="btn wide" type="button" id="phoneReadCamera">Use phone camera</button>
+          <button class="btn primary wide" type="button" id="cameraButton">Use PC camera</button>
         </span>
       </footer>
     </section>
 
-    <!-- スマホ -->
+    <!-- Phone -->
     <section class="view" data-panel="phone" hidden>
-      <header class="card-head"><h1>スマホ</h1></header>
+      <header class="card-head"><h1>Phone</h1></header>
       <div class="view-body scroll">
         <div class="phone">
           <div class="pair">
@@ -139,10 +139,10 @@
             <div class="pair-text">
               <p class="pair-lead" id="pairLead"></p>
               <span class="pair-url" id="pairUrl"></span>
-              <span class="pair-actions"><button class="btn small" type="button" id="copyUrl">URL をコピー</button></span>
+              <span class="pair-actions"><button class="btn small" type="button" id="copyUrl">Copy URL</button></span>
             </div>
           </div>
-          <h2 class="label gap">つながっているスマホ</h2>
+          <h2 class="label gap">Connected phones</h2>
           <div class="list" id="remoteList"></div>
         </div>
       </div>
@@ -150,12 +150,12 @@
   </main>
 </div>
 
-<!-- QR を出している間 -->
+<!-- QR display -->
 <div class="present" id="present" tabindex="-1" hidden>
   <div class="present-qr" id="presentFrame"><img id="presentImage" alt=""></div>
   <div class="present-bar" id="presentBar">
-    <span class="stepper"><button type="button" class="step" id="presentSmaller" aria-label="小さくする"></button><span class="step-value" id="presentSize"></span><button type="button" class="step plus" id="presentLarger" aria-label="大きくする"></button></span>
-    <button class="btn wide" type="button" id="stopQr">送るのをやめる</button>
+    <span class="stepper"><button type="button" class="step" id="presentSmaller" aria-label="Decrease size"></button><span class="step-value" id="presentSize"></span><button type="button" class="step plus" id="presentLarger" aria-label="Increase size"></button></span>
+    <button class="btn wide" type="button" id="stopQr">Stop sending</button>
   </div>
 </div>
 
@@ -165,20 +165,20 @@
   <div class="dialog" role="dialog" aria-labelledby="confirmTitle">
     <h2 class="dialog-title" id="confirmTitle"></h2>
     <p class="dialog-text" id="confirmText"></p>
-    <div class="dialog-actions"><button class="btn wide" type="button" id="confirmCancel">やめる</button><button class="btn primary wide" type="button" id="confirmOk">送る</button></div>
+    <div class="dialog-actions"><button class="btn wide" type="button" id="confirmCancel">Cancel</button><button class="btn primary wide" type="button" id="confirmOk">Send</button></div>
   </div>
 </div>
 
 <div class="dialog-back" id="tipsDialog" hidden>
   <div class="dialog" role="dialog" aria-labelledby="tipsTitle">
-    <h2 class="dialog-title" id="tipsTitle">読めないとき</h2>
+    <h2 class="dialog-title" id="tipsTitle">Troubleshooting</h2>
     <ul class="tips">
-      <li>Tile なら、送る側の「セルの大きさ」を 1 px ずつ大きくするか、「中央の粗い区画」を 2 倍にします。画面の一部しか映っていなくても読めます。</li>
-      <li>QR なら、送る側の「1 枚の量」を 1,465 bytes まで下げ、それでも読めなければ 24 fps まで下げます。QR は全体が映っている必要があります。</li>
-      <li>カメラを何かに立てかけて動かないようにし、ピントが合うまで数秒待ちます。</li>
-      <li>送る画面の明るさを最大にします。</li>
+      <li>For Tile, increase Cell size by 1 px at a time or set Coarse center to 2×. A partial view of the screen is enough.</li>
+      <li>For QR, reduce Bytes per frame to 1,465, then reduce Frame rate to 24 fps if needed. Keep the entire QR code in view.</li>
+      <li>Rest the camera on a steady surface and allow a few seconds for it to focus.</li>
+      <li>Set the sending screen to maximum brightness.</li>
     </ul>
-    <div class="dialog-actions"><button class="btn primary wide" type="button" id="tipsClose">閉じる</button></div>
+    <div class="dialog-actions"><button class="btn primary wide" type="button" id="tipsClose">Close</button></div>
   </div>
 </div>
 

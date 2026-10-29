@@ -11,11 +11,8 @@ using MiniUI.Platform.Linux;
 
 namespace Xfer;
 
-/// <summary>Xfer on Linux: MiniUI (GTK3/X11) shows ui/index.html, the same page as on Windows, and NativeApp
-/// answers its uiHost.call and app: images in this process (the Windows build loads the same code as MiniUI.App.dll).
-/// --no-browser and --help run only the HTTP server, as before. --window-at X,Y (X11 pixels), --window WxH and
-/// --fullscreen place the window from the command line (measurement set-ups on a desktop that takes no remote
-/// input); with --window-at, fullscreen waits until the window is where asked.</summary>
+/// <summary>Linux desktop host. Renders ui/index.html through GTK3/X11 and handles native calls and images
+/// in this process. With --window-at, fullscreen waits for the requested window position.</summary>
 internal static class MiniUIHost
 {
     public static int Main(string[] args)
@@ -55,9 +52,9 @@ internal static class MiniUIHost
             return Program.Run(home, appArgs.ToArray());
 
         string entry = Path.Combine(home, "ui", "index.html");
-        if (!File.Exists(entry)) throw new FileNotFoundException("ui/index.html が見つかりません: " + entry);
+        if (!File.Exists(entry)) throw new FileNotFoundException("ui/index.html was not found: " + entry);
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISPLAY")))
-            throw new InvalidOperationException("X11 の DISPLAY がありません。デスクトップの端末から起動してください。");
+            throw new InvalidOperationException("DISPLAY is not set. Start Xfer from an X11 desktop session.");
         stateDir ??= Path.Combine(Environment.GetEnvironmentVariable("XDG_STATE_HOME") ??
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "state"), "Xfer", "miniui");
         Directory.CreateDirectory(stateDir);
@@ -79,10 +76,9 @@ internal static class MiniUIHost
             using var fonts = new LinuxFonts(fontDir);
             using var window = new LinuxWindow(windowSize?[0] ?? options.Width, windowSize?[1] ?? options.Height, options.Title, fonts);
             // --window-at is in X11 pixels (as xrandr and wmctrl give them); GTK places windows in its own units, the
-            // X11 pixels divided by the window's scale (2 under a doubled XWayland). Fullscreen waits until the
-            // window is seen at the place asked for, then names the monitor there; if the window never gets there it
-            // stays a window (it must not cover whichever screen it happened to open on). (Hiding the window while
-            // placing it left it minimised under Mutter.)
+            // X11 pixels divided by the window scale. Wait for placement before choosing the fullscreen monitor;
+            // a timeout leaves the window at its current size. Keep it visible during placement because hiding
+            // it can leave it minimized under Mutter.
             int[]? target = null;
             if (windowAt != null)
             {
@@ -168,10 +164,9 @@ internal static class MiniUIHost
         return 0;
     }
 
-    // Fullscreen on a named monitor. Mutter with a scaled XWayland may take the window to be on another monitor than
-    // the one it shows on and fill that one (seen: a window at the EV2450's corner given a portrait EV2740S's size),
-    // so the monitor is named through _NET_WM_FULLSCREEN_MONITORS (gtk_window_fullscreen_on_monitor). The window is
-    // this process's GTK toplevel at the place asked for (MiniUI shows one). GTK units throughout.
+    // Scaled XWayland can choose a different fullscreen monitor from the one containing the window.
+    // Specify the monitor through gtk_window_fullscreen_on_monitor. Coordinates are in GTK units;
+    // this host owns a single GTK toplevel.
     [DllImport("libgtk-3.so.0")] private static extern nint gtk_window_list_toplevels();
     [DllImport("libgtk-3.so.0")] private static extern void gtk_window_get_position(nint window, out int x, out int y);
     [DllImport("libgtk-3.so.0")] private static extern int gtk_widget_get_visible(nint widget);

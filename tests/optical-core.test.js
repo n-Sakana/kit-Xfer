@@ -148,7 +148,7 @@ test("streaming frame keeps 64-bit chunk identity and rejects malformed lengths"
   const bytes = new Uint8Array(245), view = new DataView(bytes.buffer);
   bytes[0] = 0xd1; bytes[1] = 0x0d;
   view.setUint32(4, 17, true);
-  // 8 TiB, last chunk: far past the old total/block limits, exact as a JS number.
+  // The last chunk of an 8 TiB transfer must remain exact as a JavaScript number.
   view.setUint32(20, 2048, true);
   view.setUint32(8, 134217727, true);
   view.setUint16(44, 197, true);

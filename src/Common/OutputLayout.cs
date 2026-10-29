@@ -13,11 +13,11 @@ namespace Xfer
         {
             if (string.IsNullOrWhiteSpace(outputRoot))
             {
-                throw new ArgumentException("出力フォルダが指定されていません。", "outputRoot");
+                throw new ArgumentException("No output folder was specified.", "outputRoot");
             }
             if (source == null || source.SourceKind == "none")
             {
-                throw new ArgumentException("入力が選ばれていません。", "source");
+                throw new ArgumentException("No input was selected.", "source");
             }
 
             return CreateRunDirectory(outputRoot, TargetName(source));
@@ -27,11 +27,11 @@ namespace Xfer
         {
             if (string.IsNullOrWhiteSpace(outputRoot))
             {
-                throw new ArgumentException("出力フォルダが指定されていません。", "outputRoot");
+                throw new ArgumentException("No output folder was specified.", "outputRoot");
             }
             if (string.IsNullOrWhiteSpace(targetName))
             {
-                throw new ArgumentException("出力名が指定されていません。", "targetName");
+                throw new ArgumentException("No output name was specified.", "targetName");
             }
 
             var root = Path.GetFullPath(outputRoot);
@@ -117,7 +117,7 @@ namespace Xfer
                 }
             }
 
-            throw new IOException("空いている出力フォルダ名を作れませんでした。");
+            throw new IOException("Could not create a unique output folder name.");
         }
     }
 }

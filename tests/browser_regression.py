@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""Real Chromium/WASM tests with synthetic camera images and explicitly mocked HTTP APIs.
-No physical camera, WPF, or modified C# execution is claimed by this test.
-"""
+"""Chromium/WASM tests with synthetic camera images and mocked HTTP APIs."""
 from __future__ import annotations
 import base64
 import json
@@ -352,7 +350,7 @@ with sync_playwright() as pw:
     assert ui.locator('#frameAmount option[value="2953"]').is_disabled()
     ui.select_option('#errorCorrection','L')
     passed('EC change disables invalid QR capacities and selects a valid amount')
-    ui.click('#showQr');ui.wait_for_function("document.getElementById('qrProgress').textContent.includes('表示')")
+    ui.click('#showQr');ui.wait_for_function("document.getElementById('qrProgress').textContent.includes('Display')")
     assert not ui.locator('#qrOverlay').is_hidden()
     assert state['batches']>0
     # Resize, including mobile landscape, may not blank or clip the QR.
@@ -365,7 +363,7 @@ with sync_playwright() as pw:
     ui.click('#closeQr');ui.wait_for_timeout(100);assert ui.locator('#qrOverlay').is_hidden();assert state['stops']
     passed('closing QR stops its server token')
     ui.select_option('#frameAmount','1000');state['actual_frame_bytes']=400
-    ui.click('#showQr');ui.wait_for_function("document.getElementById('qrProgress').textContent.includes('表示')")
+    ui.click('#showQr');ui.wait_for_function("document.getElementById('qrProgress').textContent.includes('Display')")
     assert ui.locator('#frameAmount').input_value()=='1000'
     ui.click('#closeQr');state['actual_frame_bytes']=1000
     passed('a tiny actual frame does not reduce the next transfer payload setting')
@@ -378,15 +376,15 @@ with sync_playwright() as pw:
       window.virtualCameraTimer=setInterval(()=>{ctx.drawImage(images[frame++%images.length],0,0);},100);
       navigator.mediaDevices.getUserMedia=async()=>canvas.captureStream(30);
     }""")
-    # The camera button belongs to 受け取る, as on the desktop screen.
+    # The camera button belongs to Receive, as on the desktop screen.
     ui.click('#opticalDirection [data-view="receive"]');assert ui.locator('#readLocalCamera').is_visible()
-    ui.click('#readLocalCamera');ui.wait_for_function("document.getElementById('receiveState').textContent==='受け取りました'",timeout=20000)
+    ui.click('#readLocalCamera');ui.wait_for_function("document.getElementById('receiveState').textContent==='Received'",timeout=20000)
     assert len(set(state['uploads']))>=6 and state['fail_uploads']==0
     assert not errors, errors
     passed('canvas camera -> real WASM -> bounded uploads -> completion survives a 503 response')
     ui.screenshot(path=str(RESULTS/'receive-ui.png'),full_page=True)
     first_id=state['receive_ids'][-1]
-    ui.click('#readLocalCamera');ui.wait_for_function("document.getElementById('readLocalCamera').textContent.includes('やめる')")
+    ui.click('#readLocalCamera');ui.wait_for_function("document.getElementById('readLocalCamera').textContent.includes('Stop scanning')")
     ui.click('#readLocalCamera');ui.wait_for_timeout(100)
     assert len(state['receive_ids'])>=2 and state['receive_ids'][-1]!=first_id
     passed('camera restart gets a new receiver ID; stopping camera clears its stream')
@@ -394,7 +392,7 @@ with sync_playwright() as pw:
     ui.evaluate('clearInterval(window.virtualCameraTimer)')
     # Denied permission is not retried with another permission request.
     ui.evaluate("()=>{window.deniedCalls=0;navigator.mediaDevices.getUserMedia=async()=>{window.deniedCalls++;throw new DOMException('denied','NotAllowedError');};}")
-    ui.click('#readLocalCamera');ui.wait_for_function("document.getElementById('cameraLabel').textContent.includes('許可')")
+    ui.click('#readLocalCamera');ui.wait_for_function("document.getElementById('cameraLabel').textContent.includes('Camera access is denied')")
     assert ui.evaluate('window.deniedCalls')==1
     passed('camera denial produces one permission attempt, not an unconditional retry')
     # Remote polling may update the file list but must not close a running QR.
@@ -403,7 +401,7 @@ with sync_playwright() as pw:
         ui.close();ui=context.new_page();ui.on('pageerror',lambda error:errors.append(str(error)));memory_ui(ui,api)
     else: ui.reload()
     ui.wait_for_function("document.getElementById('showQr').disabled===false")
-    ui.click('#showQr');ui.wait_for_function("document.getElementById('qrProgress').textContent.includes('表示')")
+    ui.click('#showQr');ui.wait_for_function("document.getElementById('qrProgress').textContent.includes('Display')")
     state['folder_revision']+=1
     ui.wait_for_timeout(2700)
     assert not ui.locator('#qrOverlay').is_hidden()

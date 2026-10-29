@@ -1,7 +1,4 @@
-' This file must stay pure ASCII. wscript.exe reads a .vbs as the system ANSI
-' code page unless it starts with a UTF-16 byte order mark, so a non-ASCII
-' character saved as UTF-8 makes the whole script fail to compile. Japanese
-' wording therefore lives in README.md and in the log file, not here.
+' Keep this script ASCII: wscript.exe uses the system ANSI code page without a UTF-16 BOM.
 
 Option Explicit
 
@@ -23,7 +20,7 @@ command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle H
 
 shell.CurrentDirectory = baseDir
 
-' Wait for Xfer so a failure before the WPF window opens can still be
+' Wait for Xfer so a failure before the desktop window opens can still be
 ' reported instead of disappearing with the hidden launcher.
 exitCode = shell.Run(command, 0, True)
 

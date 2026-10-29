@@ -21,10 +21,9 @@ namespace Xfer
         void Start(Action<byte[], int, int> frame);
     }
 
-    /// <summary>A camera whose focus can be held at its current setting (autofocus stopped) and handed back to
-    /// autofocus. Autofocus on a screen of fine detail wanders off and back for seconds at a time (C920 on FX2: from
-    /// 44 to 19 and stuck there); the receiver holds the focus while pictures read well and lets autofocus search
-    /// again when they stop. Cameras without this keep their own focus.</summary>
+    /// <summary>A camera with temporary focus locking. Changing screen patterns can cause autofocus hunting;
+    /// the receiver holds focus while decoding succeeds and releases it when reception degrades.
+    /// Cameras without this interface retain their own focus control.</summary>
     internal interface IFocusHold
     {
         void HoldFocus();
@@ -238,8 +237,8 @@ namespace Xfer
             // (two patches' corners), even if no patch reads (focus, distance). Readable marker IDs alone are not
             // enough: a QR code's finder and alignment patterns look like markers.
             if (read.Frames.Count == 0 && read.Patches.Count < 2) return false;
-            // A majority of cleanly sampled patches is enough to hold useful focus. Requiring 80% let
-            // autofocus keep hunting at L even while most patches were CRC-valid after mild sharpening.
+            // A majority of cleanly sampled patches indicates useful focus; a stricter threshold can
+            // prolong autofocus hunting despite CRC-valid reception.
             Focus(read.LumaDecoded, read.LumaDecoded >= 3 && read.Plain * 10 >= read.LumaDecoded * 6);
             Diagnostics.Sample("camera.fx2_read", "native", read.Ms, new { Markers = read.Markers.Count, Patches = read.Patches.Count, Decoded = read.Frames.Count,
                 LumaDecoded = read.LumaDecoded, Plain = read.Plain, ColorSeen = read.ColorSeen, ColorDecoded = read.ColorDecoded,

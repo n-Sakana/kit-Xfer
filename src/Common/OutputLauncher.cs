@@ -10,7 +10,7 @@ namespace Xfer
         {
             if (string.IsNullOrWhiteSpace(outputPath))
             {
-                throw new InvalidOperationException("先に出力を作ってください。");
+                throw new InvalidOperationException("Create output before opening it.");
             }
 
             var fullPath = Path.GetFullPath(outputPath);
@@ -25,12 +25,12 @@ namespace Xfer
             }
             else
             {
-                throw new FileNotFoundException("出力先が見つかりません。", fullPath);
+                throw new FileNotFoundException("The output path was not found.", fullPath);
             }
 
             if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
             {
-                throw new DirectoryNotFoundException("出力先のフォルダが見つかりません。");
+                throw new DirectoryNotFoundException("The output folder was not found.");
             }
 
             ProcessStartInfo startInfo;

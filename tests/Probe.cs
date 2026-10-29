@@ -15,10 +15,10 @@ namespace Xfer
             File.WriteAllText(Path.Combine(root, "outside.bin"), "SECRET OUTSIDE");
             var snap = FolderCatalog.Inspect(source);
 
-            Check("重複したファイル名", snap, new[] { "sample.bin", "sample.bin" });
-            Check("親へ抜ける相対パス", snap, new[] { "../outside.bin" });
-            Check("絶対パス", snap, new[] { Path.Combine(root, "outside.bin") });
-            Check("深い親抜け", snap, new[] { "../../../../../../Windows/win.ini" });
+            Check("duplicate file name", snap, new[] { "sample.bin", "sample.bin" });
+            Check("parent traversal", snap, new[] { "../outside.bin" });
+            Check("absolute path", snap, new[] { Path.Combine(root, "outside.bin") });
+            Check("nested parent traversal", snap, new[] { "../../../../../../Windows/win.ini" });
         }
 
         private static void Check(string label, FolderSnapshot snap, string[] names)
@@ -26,11 +26,11 @@ namespace Xfer
             try
             {
                 var payload = OpticalPayload.Build(snap, names);
-                Console.WriteLine("!! 通った        " + label + "  bytes=" + payload.Bytes.Length);
+                Console.WriteLine("Accepted: " + label + "  bytes=" + payload.Bytes.Length);
             }
             catch (Exception e)
             {
-                Console.WriteLine("   弾いた " + e.GetType().Name + "   " + label);
+                Console.WriteLine("Rejected: " + e.GetType().Name + "   " + label);
             }
         }
     }

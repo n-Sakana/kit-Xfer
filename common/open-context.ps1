@@ -76,7 +76,7 @@ try {
     $targetPath = $null
     if ($Mode -eq "optical") {
         if ([string]::IsNullOrWhiteSpace($Target)) {
-            throw "the optical-transfer target is missing"
+            throw "The transfer target is missing."
         }
         # A quoted root path ending in '\' can arrive with the final slash changed
         # to '"'. Windows paths cannot contain '"', so restoring it is unambiguous.
@@ -86,7 +86,7 @@ try {
 
         $targetPath = [IO.Path]::GetFullPath($Target)
         if (-not (Test-Path -LiteralPath $targetPath)) {
-            throw "selected item not found: $targetPath"
+            throw "Selected item not found: $targetPath"
         }
     }
 
@@ -110,7 +110,7 @@ try {
                 $running = $latest
             }
         }
-        throw "the running Xfer desktop window could not be activated"
+        throw "Could not activate the running Xfer desktop window."
     }
 
     $XferScript = Join-Path $script:XferRoot "Xfer.ps1"

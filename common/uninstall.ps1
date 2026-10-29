@@ -1,5 +1,4 @@
 ﻿# uninstall.ps1 -- choose and remove one of the current user's right-click registrations.
-# The kit's shared uninstaller: the same file in every app, apart from the app section below.
 # Direct run shows the list; -KeyName removes one verb without asking (for tests and scripts);
 # dot-sourcing loads the functions only.
 [CmdletBinding()]

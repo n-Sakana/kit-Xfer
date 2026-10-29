@@ -47,7 +47,7 @@ internal static partial class CameraLab
     {
         Console.WriteLine("""
 CameraLab list | selftest
-CameraLab formats [CAMERA] [--out FILE.json]  (opens camera: coordinate first!)
+CameraLab formats [CAMERA] [--out FILE.json]  (requires exclusive camera access)
 CameraLab focus-hold OUT [CAMERA]  (no window; tests product hold/release and shutdown restoration)
 CameraLab capture OUT WIDTH FPS SECONDS [CAMERA] [options]
   OUT must be new or empty. Default camera: unique name containing C920.

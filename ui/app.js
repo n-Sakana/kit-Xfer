@@ -7,14 +7,13 @@
   var FRAME_RATES = [10, 15, 20, 24, 30, 60];
   var COLUMNS = [1, 2, 3];
   var DEFAULT_FPS = 30, DEFAULT_COLUMNS = 1;
-  // Tile (named "fx2" in settings and requests): independent patches fill the window. 30 fps was fastest
-  // in the C920 screen-to-file measurements; patches crossing a display transition are recovered later.
+  // Tile uses "fx2" in settings and requests. Independent patches crossing a display
+  // transition can be recovered from later frames.
   var DEFAULT_LAYOUT = "fx2", DEFAULT_FX2_FPS = 30, DEFAULT_COARSE = 0, MAX_CELL = 32;
   // Tile cells are set and shown in CSS px (3 by default, like the rest of the page) and drawn in whole device
   // pixels: the CSS size times the pixel ratio, rounded.
   var DEFAULT_CELL = 3, MAX_CSS_CELL = 16;
-  var cellOverride = null; // device px from --cell (measurements), not saved
-  // Full HD capture: every cell or QR module covers half as many pixels again as at 1280.
+  var cellOverride = null; // Device pixels from --cell; applies only to this launch.
   var DEFAULT_CAMERA_WIDTH = 1920, DEFAULT_WORKERS = 3;
   var EC_LIMIT = { L: 2953, M: 2331, Q: 1663, H: 1273 };
 
@@ -80,14 +79,14 @@
     if (n < 1024) return n + " B";
     var units = ["KB", "MB", "GB"], unit = -1;
     do { n /= 1024; unit++; } while (n >= 1024 && unit < units.length - 1);
-    return (n >= 100 ? Math.round(n) : Math.round(n * 10) / 10).toLocaleString("ja-JP") + " " + units[unit];
+    return (n >= 100 ? Math.round(n) : Math.round(n * 10) / 10).toLocaleString("en-US") + " " + units[unit];
   }
-  function count(n) { return Number(n || 0).toLocaleString("ja-JP"); }
+  function count(n) { return Number(n || 0).toLocaleString("en-US"); }
   function seconds(value) {
     var s = Math.max(0, Number(value) || 0);
-    if (s < 60) return Math.max(1, Math.ceil(s)) + " 秒";
+    if (s < 60) return Math.max(1, Math.ceil(s)) + " s";
     var m = Math.floor(Math.ceil(s) / 60), rest = Math.ceil(s) % 60;
-    return m + " 分" + (rest ? " " + rest + " 秒" : "");
+    return m + " min" + (rest ? " " + rest + " s" : "");
   }
   function pad(n) { return n < 10 ? "0" + n : String(n); }
   function date(value) {
@@ -112,7 +111,7 @@
 
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
-    $("themeButton").textContent = theme === "dark" ? "ライトにする" : "ダークにする";
+    $("themeButton").textContent = theme === "dark" ? "Use light theme" : "Use dark theme";
   }
   $("themeButton").addEventListener("click", function () {
     var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
@@ -316,7 +315,7 @@
     var total = state.files.length;
     all.setAttribute("aria-checked", total > 0 && totals.selectedCount === total ? "true" : totals.selectedCount > 0 ? "mixed" : "false");
     all.disabled = total === 0;
-    $("sendSummary").textContent = total === 0 ? "" : count(totals.selectedCount) + " ファイル · " + bytes(totals.selectedBytes);
+    $("sendSummary").textContent = total === 0 ? "" : "Files: " + count(totals.selectedCount) + " · " + bytes(totals.selectedBytes);
     updateSendButtons();
   }
 
@@ -420,7 +419,7 @@
   }
   $("cellSmaller").addEventListener("click", function () { changeCell(-1); });
   $("cellLarger").addEventListener("click", function () { changeCell(1); });
-  function columnsLabel(value) { return value === 1 ? "1 枚" : value + " 枚を横に"; }
+  function columnsLabel(value) { return value === 1 ? "1 code" : value + " columns"; }
   $("columns").addEventListener("click", function () {
     var current = setting("columns", DEFAULT_COLUMNS);
     showMenu(this, COLUMNS.map(function (value) {
@@ -448,7 +447,7 @@
     if (state.folder.selectedBytes > 16 * MB && layout() === "qr") {
       var blocks = Math.ceil(state.folder.selectedBytes / (setting("frameBytes", 1000) - 20));
       var perSecond = setting("fps", DEFAULT_FPS) * setting("columns", DEFAULT_COLUMNS) * setting("rows", 1);
-      confirm("大きいファイルを送ります", bytes(state.folder.selectedBytes) + " あります。送り終えるまで少なくとも " + seconds(blocks / perSecond) + "かかります。", startSending);
+      confirm("Send a large transfer", bytes(state.folder.selectedBytes) + " total. Sending will take at least " + seconds(blocks / perSecond) + ".", startSending);
       return;
     }
     startSending();
@@ -517,7 +516,7 @@
   }
 
   // The QR image has whole device pixels per module and is placed on whole device pixels, so it is drawn one
-  // image pixel per screen pixel: every module keeps the same sharp size. "QR の大きさ" is the size of one code;
+  // image pixel per screen pixel: every module keeps the same sharp size. "QR size" is the size of one code;
   // several codes side by side shrink together when the window is too narrow for them.
   // Tile fills the window, from its top-left corner (whole device pixels), one image pixel per screen
   // pixel; the layout of that size says how many patches (sequence numbers) each picture carries.
@@ -538,7 +537,7 @@
     image.style.height = s.height / ratio + "px";
     $("presentBar").style.top = (s.height / ratio - bar) + "px";
     showFrame();
-    $("presentSize").textContent = "セル " + cellShown() + " px";
+    $("presentSize").textContent = "Cell " + cellShown() + " px";
     $("presentSmaller").disabled = cellShown() <= 1;
     $("presentLarger").disabled = cellShown() >= MAX_CSS_CELL || s.cell >= MAX_CELL;
   }
@@ -621,7 +620,7 @@
     document.querySelectorAll("#workersGroup button").forEach(function (b) { b.classList.toggle("is-on", Number(b.getAttribute("data-workers")) === setting("workers", DEFAULT_WORKERS)); b.disabled = running; });
     $("cameraSelect").disabled = running;
     $("openWhenDone").setAttribute("aria-checked", setting("openWhenDone", true) ? "true" : "false");
-    $("cameraButton").textContent = running ? "読むのをやめる" : "この PC のカメラで読む";
+    $("cameraButton").textContent = running ? "Stop scanning" : "Use PC camera";
     $("cameraButton").disabled = !running && state.cameras.length === 0;
     $("phoneReadCamera").disabled = state.remotes === 0;
   }
@@ -642,7 +641,7 @@
   });
 
   function resetMeter() {
-    $("receiveState").textContent = "待っています";
+    $("receiveState").textContent = "Waiting";
     $("receiveEta").textContent = "";
     $("receiveBlocks").textContent = "";
     $("receiveRate").textContent = "";
@@ -659,7 +658,7 @@
     } catch (error) { fail(error); return; }
     state.camera = { preview: -1, hintDismissed: false, timer: setInterval(pollCamera, 33) };
     $("previewIdle").textContent = "";
-    $("receiveState").textContent = "QR を待っています";
+    $("receiveState").textContent = "Waiting for QR codes";
     renderReceiveSettings();
   }
 
@@ -680,7 +679,7 @@
     try { native("receive.stop"); } catch (error) { /* already stopped */ }
     $("previewImage").removeAttribute("src");
     sizePreview();
-    $("previewIdle").textContent = "カメラは止まっています";
+    $("previewIdle").textContent = "Camera stopped";
     $("quietHint").hidden = true;
     $("receiveSummary").textContent = "";
     if (!keepMeter) resetMeter();
@@ -713,35 +712,35 @@
       sizePreview();
     }
     if (status.width && show) $("receiveSummary").textContent = status.camera + " · " + status.width + "×" + status.height + " · " + Math.round(status.fps) + " fps" +
-      (status.layout === "fx2" ? " · Tile " + count(status.patchesSeen) + " 区画" : "");
+      (status.layout === "fx2" ? " · Tile patches: " + count(status.patchesSeen) : "");
     var result = status.result;
     if (result && result.recognized) {
       // The sender changed and the receiver moved to the new transfer (OpticalReceiveService.SwitchAfter).
-      if ((result.switches || 0) > (camera.switches || 0)) { camera.switches = result.switches; toast("別の送信に切り替えました"); }
+      if ((result.switches || 0) > (camera.switches || 0)) { camera.switches = result.switches; toast("Switched to another transfer"); }
       var percent = Math.max(0, Math.min(100, Math.floor(result.progress * 100)));
       $("receiveBar").style.width = percent + "%";
       if (show || result.complete) {
-        $("receiveBlocks").textContent = count(result.solvedBlocks) + " / " + count(result.sourceBlocks) + " ブロック";
-        $("receiveRate").textContent = (Math.round(result.kilobytesPerSecond * 10) / 10).toLocaleString("ja-JP") + " KB/s";
+        $("receiveBlocks").textContent = "Blocks: " + count(result.solvedBlocks) + " / " + count(result.sourceBlocks);
+        $("receiveRate").textContent = (Math.round(result.kilobytesPerSecond * 10) / 10).toLocaleString("en-US") + " KB/s";
       }
       if (result.complete) {
-        $("receiveState").textContent = "受け取りました";
-        $("receiveEta").textContent = "合計 " + seconds(result.elapsedSeconds);
+        $("receiveState").textContent = "Received";
+        $("receiveEta").textContent = "Total: " + seconds(result.elapsedSeconds);
         $("receiveBar").classList.add("is-done");
         state.receivedPath = result.outputPath || "";
-        $("receiveResultText").textContent = count(result.fileCount) + " ファイル · " + bytes(result.totalBytes) + "　" + (result.outputPath || "");
+        $("receiveResultText").textContent = "Files: " + count(result.fileCount) + " · " + bytes(result.totalBytes) + " " + (result.outputPath || "");
         $("receiveResult").hidden = false;
         stopReceiving(true);
         if (result.openError) toast(result.openError);
         return;
       }
       if (show) {
-        $("receiveState").textContent = "受け取っています " + percent + "%";
+        $("receiveState").textContent = "Receiving " + percent + "%";
         var remaining = result.progress > 0 ? result.elapsedSeconds * (1 - result.progress) / result.progress : 0;
-        $("receiveEta").textContent = remaining > 0 ? "残り " + seconds(remaining) : "";
+        $("receiveEta").textContent = remaining > 0 ? "Remaining: " + seconds(remaining) : "";
       }
     }
-    if (status.error) { stopReceiving(true); $("receiveState").textContent = "止まりました"; toast(status.error); return; }
+    if (status.error) { stopReceiving(true); $("receiveState").textContent = "Stopped"; toast(status.error); return; }
     $("quietHint").hidden = camera.hintDismissed || status.quietMs < 8000;
   }
 
@@ -777,7 +776,7 @@
       $("pairUrl").textContent = entry.url;
       $("pairUrl").title = entry.url;
       $("copyUrl").disabled = false;
-      $("pairLead").textContent = "スマホのカメラで読むと、この PC につながります。";
+      $("pairLead").textContent = "Scan this code with your phone to connect to this PC.";
     }).catch(function (error) {
       $("pairLead").textContent = error.message;
     });
@@ -786,7 +785,7 @@
   $("copyUrl").addEventListener("click", function () {
     var url = $("pairUrl").textContent;
     if (!url) return;
-    navigator.clipboard.writeText(url).then(function () { toast("URL をコピーしました"); });
+    navigator.clipboard.writeText(url).then(function () { toast("URL copied"); });
   });
 
   function renderRemotes() {
@@ -794,7 +793,7 @@
     var remotes = [];
     try { remotes = native("remote.list").remotes; } catch (error) { remotes = []; }
     list.replaceChildren();
-    if (remotes.length === 0) { list.appendChild(text("list-empty", "つながっているスマホはありません")); return; }
+    if (remotes.length === 0) { list.appendChild(text("list-empty", "No phones connected")); return; }
     remotes.forEach(function (remote) {
       var row = document.createElement("div");
       row.className = "list-row";
@@ -812,11 +811,11 @@
       toast(message);
     } catch (error) { fail(error); }
   }
-  $("phoneShowQr").addEventListener("click", function () { sendToPhone("showQr", "スマホに QR を出します"); });
+  $("phoneShowQr").addEventListener("click", function () { sendToPhone("showQr", "Showing QR codes on the phone"); });
   // The phone's camera reads QR codes only; nothing here switches by itself, the message says what to choose.
   $("phoneReadCamera").addEventListener("click", function () {
-    sendToPhone("readCamera", layout() === "qr" ? "スマホのカメラで読みます"
-      : "スマホのカメラで読みます。スマホは QR だけを読むので、送り方の「表示」を QR にしてから出してください");
+    sendToPhone("readCamera", layout() === "qr" ? "Starting the phone camera"
+      : "Starting the phone camera. Phones read QR only; set Display to QR on the sender.");
   });
 
   // ---------------------------------------------------------------- keyboard and background polling
@@ -874,7 +873,7 @@
       loadFolder();
       loadCameras();
       if (state.info.pathError) toast(state.info.pathError);
-      else if (state.info.serverError) toast("スマホとはつながりません: " + state.info.serverError);
+      else if (state.info.serverError) toast("Phone connection unavailable: " + state.info.serverError);
     } catch (error) {
       fail(error);
     }
@@ -887,8 +886,7 @@
     autoReceive();
   }
 
-  // Measurement start-up (--send on the command line): the given settings apply to this window only, without
-  // being saved, and the QR for the chosen file is shown at once.
+  // --send starts immediately using launch-only overrides.
   function autoSend() {
     var auto = state.info && state.info.autoSend;
     if (!auto) return;
@@ -906,12 +904,11 @@
     settings.keystoneX = auto.keystoneX || 0;
     settings.keystoneY = auto.keystoneY || 0;
     renderSendSettings();
-    if (!state.folder || state.folder.selectedCount === 0) { toast("送るファイルがありません"); return; }
+    if (!state.folder || state.folder.selectedCount === 0) { toast("No files selected to send"); return; }
     startSending();
   }
 
-  // Measurement start-up (--receive): the receive view starts the camera at once, with the given settings for this
-  // window only.
+  // --receive starts the camera using launch-only overrides.
   function autoReceive() {
     var auto = state.info && state.info.autoReceive;
     if (!auto) return;
@@ -921,7 +918,7 @@
     showView("receive");
     if (auto.camera) {
       var wanted = auto.camera.toLowerCase(), found = state.cameras.filter(function (c) { return c.name.toLowerCase().indexOf(wanted) >= 0; });
-      if (found.length !== 1) { toast("カメラ「" + auto.camera + "」が " + found.length + " 台見つかりました"); return; }
+      if (found.length !== 1) { toast("Camera matching " + auto.camera + ": " + found.length + " devices found"); return; }
       settings.camera = found[0].id;
       renderReceiveSettings();
     }

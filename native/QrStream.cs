@@ -65,7 +65,7 @@ namespace Xfer
         private byte[] Render(ulong sequence)
         {
             byte[] packed;
-            if (!_service.TryRenderPackedFrames(Token, sequence, 1, out packed)) throw new InvalidOperationException("QR の表示は終了しました。");
+            if (!_service.TryRenderPackedFrames(Token, sequence, 1, out packed)) throw new InvalidOperationException("The QR display has stopped.");
             return packed;
         }
 

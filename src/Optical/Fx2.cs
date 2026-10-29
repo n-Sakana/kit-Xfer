@@ -270,7 +270,7 @@ namespace Xfer
         public static int ParseLevel(string name)
         {
             int level = Array.IndexOf(LevelNames, name);
-            if (level < 0) throw new ArgumentException("誤り訂正の設定が正しくありません。");
+            if (level < 0) throw new ArgumentException("Invalid error correction level.");
             return level;
         }
 
@@ -314,8 +314,8 @@ namespace Xfer
             var patch = new byte[_patchBytes];
             for (int i = 0; i < _patchBytes * 8; i++) if (cells[i] != 0) patch[i >> 3] |= (byte)(0x80 >> (i & 7));
             for (int i = 0; i < patch.Length; i++) patch[i] ^= Fx2.Whiten(i);
-            // A clean payload needs no Reed-Solomon syndrome calculation. Damaged payloads still take
-            // the original correction path and must pass the same CRC before reaching the fountain decoder.
+            // Skip Reed-Solomon syndrome calculation for a CRC-valid payload. Damaged payloads require
+            // correction and a matching CRC before they reach the fountain decoder.
             if (!CrcMatches(patch))
             {
                 var decoder = new ReedSolomonDecoder(Field);
@@ -405,7 +405,7 @@ namespace Xfer
         /// 0 for one tier, else the cell size factor of the middle tier.</summary>
         public static Fx2Layout Create(int width, int height, int cellPixels, int coarse)
         {
-            if (width < 1 || height < 1 || cellPixels < MinimumCell || cellPixels > MaximumCell) throw new ArgumentException("Tile の大きさが正しくありません。");
+            if (width < 1 || height < 1 || cellPixels < MinimumCell || cellPixels > MaximumCell) throw new ArgumentException("Invalid Tile dimensions.");
             var fine = Fx2Tier.Fit(0, width, height, cellPixels);
             if (fine == null) return null;
             if (coarse < 2) return new Fx2Layout(width, height, cellPixels, 0, new[] { fine });

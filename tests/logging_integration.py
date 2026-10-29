@@ -69,7 +69,7 @@ try:
         expect(page.locator('#opticalFiles .file-row')).to_have_count(1)
         # Exercise the actual page's sender, frame API, display and stop path.
         page.click('#showQr')
-        expect(page.locator('#qrProgress')).to_contain_text('表示')
+        expect(page.locator('#qrProgress')).to_contain_text('Display')
         page.wait_for_timeout(5500)
         page.click('#closeQr')
         page.evaluate('''batches => {
@@ -95,7 +95,7 @@ try:
         page.click('#opticalDirection [data-view="receive"]')
         page.evaluate("document.getElementById('receiveOpenFolder').setAttribute('aria-checked','false')")
         page.click('#readLocalCamera')
-        expect(page.locator('#receiveState')).to_have_text('受け取りました', timeout=45000)
+        expect(page.locator('#receiveState')).to_have_text('Received', timeout=45000)
         received = Path(page.locator('#receiveOutputPath').inner_text()) / secret
         assert received.read_bytes() == original
         success_log = page.evaluate('XferDiagnostics.exportJsonl()')
@@ -131,7 +131,7 @@ try:
         page.evaluate('clearInterval(window.syntheticTimer)')
         page.evaluate("() => {navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('PRIVATE_DENIAL_MESSAGE','NotAllowedError')};}")
         page.click('#readLocalCamera')
-        expect(page.locator('#cameraLabel')).to_contain_text('許可')
+        expect(page.locator('#cameraLabel')).to_contain_text('Camera access is denied')
         all_log = page.evaluate('XferDiagnostics.exportJsonl()')
         (work / 'browser-events.jsonl').write_text(all_log)
         for forbidden in [secret, session['token'], 'PRIVATE_TRANSFER_CONTENT_67d3', 'PRIVATE_DENIAL_MESSAGE', batches[0]]:

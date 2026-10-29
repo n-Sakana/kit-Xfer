@@ -27,7 +27,7 @@ function Assert-HkcuPath {
     if (-not $Path.StartsWith(
             "HKEY_CURRENT_USER\",
             [StringComparison]::OrdinalIgnoreCase)) {
-        throw "only HKCU registry paths are allowed"
+        throw "Only HKCU registry paths are allowed."
     }
 }
 
@@ -114,7 +114,7 @@ function Invoke-Install {
         "Xfer_install_" + [Guid]::NewGuid().ToString("N"))
     try {
         if (-not (Test-Path -LiteralPath $script:Launcher -PathType Leaf)) {
-            throw "context menu launcher not found: $script:Launcher"
+            throw "Context menu launcher not found: $script:Launcher"
         }
         if (-not (Test-Path -LiteralPath $script:XferScript -PathType Leaf)) {
             throw "Xfer launcher not found: $script:XferScript"
@@ -122,7 +122,7 @@ function Invoke-Install {
 
         New-Item -ItemType Directory -Path $temporaryRoot -Force | Out-Null
         if (-not (Import-RegistryLines (Build-RegistryLines $true) $temporaryRoot)) {
-            throw "registry import failed"
+            throw "Registry import failed."
         }
 
         Write-Host ""

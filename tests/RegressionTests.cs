@@ -27,6 +27,7 @@ namespace Xfer
                 Directory.CreateDirectory(input);
                 _sample = new byte[24000]; new Random(1776).NextBytes(_sample);
                 File.WriteAllBytes(Path.Combine(input, "sample.bin"), _sample);
+                // Non-ASCII content must survive compression and reconstruction.
                 File.WriteAllText(Path.Combine(input, "note.txt"), "Xfer regression 日本語\n");
                 _source = FolderCatalog.Inspect(input);
                 Run("CLI argument validation", TestOptions);
@@ -221,8 +222,6 @@ namespace Xfer
             // Resolve() looks names up in the snapshot taken from the folder, so anything
             // outside it simply is not there: the failure is FileNotFoundException, not
             // ArgumentException. Duplicates are folded by the seen set rather than rejected.
-            // Verified on Windows 2026-09-08: "../outside.bin", an absolute path and a deep
-            // "../../.." traversal are all rejected this way.
             Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { "../outside.bin" }); });
             Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { Path.Combine(_root, "outside.bin") }); });
             Throws<FileNotFoundException>(delegate { OpticalPayload.Build(_source, new[] { "../../../../../../Windows/win.ini" }); });

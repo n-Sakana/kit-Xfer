@@ -77,7 +77,7 @@ namespace Xfer
         {
             if (action != "showQr" && action != "readCamera")
             {
-                throw new ArgumentException("リモコンへの操作が正しくありません。", "action");
+                throw new ArgumentException("Invalid remote control action.", "action");
             }
 
             lock (_gate)
@@ -118,19 +118,19 @@ namespace Xfer
         {
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new ArgumentException("リモコンの識別子がありません。", "id");
+                throw new ArgumentException("Missing remote control ID.", "id");
             }
             value = value.Trim();
             if (value.Length > 100)
             {
-                throw new ArgumentException("リモコンの識別子が長すぎます。", "id");
+                throw new ArgumentException("The remote control ID is too long.", "id");
             }
             return value;
         }
 
         private static string CleanName(string value)
         {
-            value = string.IsNullOrWhiteSpace(value) ? "リモコン" : value.Trim();
+            value = string.IsNullOrWhiteSpace(value) ? "Remote" : value.Trim();
             if (value.Length > 40)
             {
                 value = value.Substring(0, 40);
@@ -143,7 +143,7 @@ namespace Xfer
             public RemoteControlState(string id)
             {
                 Id = id;
-                Name = "リモコン";
+                Name = "Remote";
                 LastSeenUtc = DateTime.UtcNow;
             }
 

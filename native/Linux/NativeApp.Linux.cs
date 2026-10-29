@@ -45,7 +45,7 @@ namespace Xfer
             if (string.IsNullOrEmpty(id))
             {
                 var cameras = Cameras();
-                if (cameras.Count == 0) throw new InvalidOperationException("カメラが見つかりません。");
+                if (cameras.Count == 0) throw new InvalidOperationException("No camera was found.");
                 id = cameras[0].Id;
             }
             return new FfmpegCamera(id, width, fps);

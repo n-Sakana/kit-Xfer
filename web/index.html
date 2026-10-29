@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,20 +14,20 @@
   <script src="/app.js?v=__Xfer_BUILD_ID__" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#workspace">本文へ移動</a>
+  <a class="skip-link" href="#workspace">Skip to content</a>
 
   <div class="app" id="appShell" data-role="loading" data-view="send">
     <header class="top">
       <span class="brand">Xfer</span>
       <div class="remote-picker">
-        <button class="pc-button" id="remoteDeviceButton" type="button" aria-label="操作する PC" aria-haspopup="listbox" aria-controls="remoteDeviceMenu" aria-expanded="false">
+        <button class="pc-button" id="remoteDeviceButton" type="button" aria-label="PC to control" aria-haspopup="listbox" aria-controls="remoteDeviceMenu" aria-expanded="false">
           <span class="dot" aria-hidden="true"></span>
-          <span class="pc-name" id="remoteDeviceName">確認中</span>
+          <span class="pc-name" id="remoteDeviceName">Checking</span>
           <span class="chevron" aria-hidden="true"></span>
         </button>
-        <div class="menu" id="remoteDeviceMenu" role="listbox" aria-label="操作する PC" hidden></div>
+        <div class="menu" id="remoteDeviceMenu" role="listbox" aria-label="PC to control" hidden></div>
       </div>
-      <button class="icon-button" type="button" data-theme-toggle aria-pressed="false" aria-label="ダークにする">
+      <button class="icon-button" type="button" data-theme-toggle aria-pressed="false" aria-label="Use dark theme">
         <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
           <circle cx="10" cy="10" r="6.75" fill="none" stroke="currentColor" stroke-width="1.5"></circle>
           <path d="M10 3.25a6.75 6.75 0 0 1 0 13.5Z" fill="currentColor"></path>
@@ -37,29 +37,29 @@
 
     <main class="workspace" id="workspace" tabindex="-1">
       <section class="page" data-page-panel="optical" aria-label="Xfer">
-        <div class="seg direction" id="opticalDirection" aria-label="送るか受け取るか">
-          <button class="is-active" type="button" data-view="send" aria-pressed="true">送る</button>
-          <button type="button" data-view="receive" aria-pressed="false">受け取る</button>
+        <div class="seg direction" id="opticalDirection" aria-label="Send or receive">
+          <button class="is-active" type="button" data-view="send" aria-pressed="true">Send</button>
+          <button type="button" data-view="receive" aria-pressed="false">Receive</button>
         </div>
 
         <div class="view" data-optical-view="send">
           <div class="toolbar local-only">
-            <button class="btn choose-files" type="button" data-picker-mode="optical">ファイルを選ぶ</button>
-            <button class="btn choose-folder" type="button" data-picker-mode="optical">フォルダを選ぶ</button>
+            <button class="btn choose-files" type="button" data-picker-mode="optical">Choose files</button>
+            <button class="btn choose-folder" type="button" data-picker-mode="optical">Choose folder</button>
           </div>
-          <span class="path" data-folder-path="optical">読み込んでいます</span>
+          <span class="path" data-folder-path="optical">Loading</span>
           <div class="table">
             <div class="thead">
-              <button class="check-cell" type="button" id="selectAll" role="checkbox" aria-checked="false" aria-label="すべて選ぶ" disabled><span class="check"></span></button>
-              <span class="c-name">名前</span><span class="c-size">サイズ</span><span class="c-date">更新日時</span>
+              <button class="check-cell" type="button" id="selectAll" role="checkbox" aria-checked="false" aria-label="Select all" disabled><span class="check"></span></button>
+              <span class="c-name">Name</span><span class="c-size">Size</span><span class="c-date">Modified</span>
             </div>
             <div class="tbody" id="opticalFiles" data-mode="optical" aria-live="polite"></div>
           </div>
 
-          <h2 class="label">送り方</h2>
+          <h2 class="label">Send settings</h2>
           <div class="group">
-            <div class="field"><span class="field-name">1 枚の量</span>
-              <span class="select"><select id="frameAmount" aria-label="1 枚の量">
+            <div class="field"><span class="field-name">Bytes per frame</span>
+              <span class="select"><select id="frameAmount" aria-label="Bytes per frame">
                 <option value="500">500 bytes</option>
                 <option value="1000" selected>1,000 bytes</option>
                 <option value="1465">1,465 bytes</option>
@@ -67,8 +67,8 @@
                 <option value="2331">2,331 bytes</option>
                 <option value="2953">2,953 bytes</option>
               </select><span class="chevron" aria-hidden="true"></span></span></div>
-            <div class="field"><span class="field-name">1 秒の枚数</span>
-              <span class="select"><select id="frameRate" aria-label="1 秒の枚数">
+            <div class="field"><span class="field-name">Frame rate</span>
+              <span class="select"><select id="frameRate" aria-label="Frame rate">
                 <option value="10">10 fps</option>
                 <option value="15">15 fps</option>
                 <option value="20">20 fps</option>
@@ -76,18 +76,18 @@
                 <option value="30" selected>30 fps</option>
                 <option value="60">60 fps</option>
               </select><span class="chevron" aria-hidden="true"></span></span></div>
-            <div class="field"><span class="field-name">誤り訂正</span>
-              <span class="select"><select id="errorCorrection" aria-label="誤り訂正">
+            <div class="field"><span class="field-name">Error correction</span>
+              <span class="select"><select id="errorCorrection" aria-label="Error correction">
                 <option value="L" selected>L</option>
                 <option value="M">M</option>
                 <option value="Q">Q</option>
                 <option value="H">H</option>
               </select><span class="chevron" aria-hidden="true"></span></span></div>
-            <div class="field"><span class="field-name">QR の大きさ</span>
+            <div class="field"><span class="field-name">QR size</span>
               <span class="stepper">
-                <button class="step" type="button" id="qrSmallerSetting" aria-label="小さくする"></button>
+                <button class="step" type="button" id="qrSmallerSetting" aria-label="Decrease size"></button>
                 <output class="step-value" id="qrSizeSetting" for="qrDisplaySize">900 px</output>
-                <button class="step plus" type="button" id="qrLargerSetting" aria-label="大きくする"></button>
+                <button class="step plus" type="button" id="qrLargerSetting" aria-label="Increase size"></button>
               </span>
               <input id="qrDisplaySize" type="hidden" min="300" max="1200" step="50" value="900">
             </div>
@@ -97,15 +97,15 @@
         <div class="view" data-optical-view="receive" hidden>
           <div class="preview" id="cameraPreview">
             <video class="preview-video" id="cameraVideo" autoplay muted playsinline hidden></video>
-            <span class="preview-idle" id="cameraLabel">カメラは止まっています</span>
+            <span class="preview-idle" id="cameraLabel">Camera stopped</span>
             <div class="hint" id="cameraNoSignal" role="status" hidden>
-              <span>QR が映っていません</span>
-              <button class="link" id="cameraNoSignalHelp" type="button">読めないとき</button>
+              <span>No QR code in view</span>
+              <button class="link" id="cameraNoSignalHelp" type="button">Troubleshooting</button>
             </div>
           </div>
           <div class="meter" aria-live="polite">
-            <div class="meter-row"><span class="meter-state" id="receiveState">待っています</span><span class="meter-eta" id="receiveEta"></span></div>
-            <div class="bar" id="receiveProgress" role="progressbar" aria-label="受け取った割合" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="bar-fill" id="receiveProgressBar"></span></div>
+            <div class="meter-row"><span class="meter-state" id="receiveState">Waiting</span><span class="meter-eta" id="receiveEta"></span></div>
+            <div class="bar" id="receiveProgress" role="progressbar" aria-label="Receive progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="bar-fill" id="receiveProgressBar"></span></div>
             <div class="meter-row sub"><span id="receiveDetail"></span><span id="receiveRate"></span></div>
           </div>
           <div class="result" id="receiveResult" hidden>
@@ -113,36 +113,36 @@
             <span class="path" id="receiveOutputPath"></span>
           </div>
 
-          <h2 class="label">カメラ</h2>
+          <h2 class="label">Camera</h2>
           <div class="group">
-            <div class="field"><span class="field-name">撮影幅</span>
-              <span class="select"><select id="cameraWidth" aria-label="撮影幅">
+            <div class="field"><span class="field-name">Capture width</span>
+              <span class="select"><select id="cameraWidth" aria-label="Capture width">
                 <option value="960">960 px</option>
                 <option value="1280" selected>1280 px</option>
                 <option value="1920">1920 px</option>
               </select><span class="chevron" aria-hidden="true"></span></span></div>
-            <div class="field"><span class="field-name">撮影 fps</span>
-              <span class="select"><select id="cameraFps" aria-label="撮影 fps">
+            <div class="field"><span class="field-name">Capture fps</span>
+              <span class="select"><select id="cameraFps" aria-label="Capture fps">
                 <option value="30">30 fps</option>
                 <option value="60" selected>60 fps</option>
               </select><span class="chevron" aria-hidden="true"></span></span></div>
-            <div class="field"><span class="field-name">読み取りの並列数</span>
-              <span class="select"><select id="cameraWorkers" aria-label="読み取りの並列数">
+            <div class="field"><span class="field-name">Decode workers</span>
+              <span class="select"><select id="cameraWorkers" aria-label="Decode workers">
                 <option value="1">1</option>
                 <option value="2" selected>2</option>
                 <option value="3">3</option>
               </select><span class="chevron" aria-hidden="true"></span></span></div>
           </div>
 
-          <h2 class="label">保存</h2>
+          <h2 class="label">Save</h2>
           <div class="group">
-            <div class="field"><span class="field-name">終わったらフォルダを開く</span>
-              <button class="switch" id="receiveOpenFolder" type="button" role="switch" aria-checked="true" aria-label="終わったらフォルダを開く"></button></div>
+            <div class="field"><span class="field-name">Open folder when complete</span>
+              <button class="switch" id="receiveOpenFolder" type="button" role="switch" aria-checked="true" aria-label="Open folder when complete"></button></div>
           </div>
         </div>
 
         <div class="local-only phone-section">
-          <h2 class="label">スマホ</h2>
+          <h2 class="label">Phone</h2>
           <div class="pair">
             <div class="pair-qr"><img id="pairingQr" width="148" height="148" alt="" hidden></div>
             <div class="pair-text">
@@ -158,51 +158,51 @@
     <footer class="foot">
       <span class="summary send-only" id="sendSummary"></span>
       <div class="actions">
-        <button class="btn send-only local-only" id="showRemoteQr" type="button" disabled>スマホに QR を出す</button>
-        <button class="btn primary send-only" id="showQr" type="button" disabled>この画面に QR を出す</button>
-        <button class="btn receive-only local-only" id="readRemoteCamera" type="button" disabled>スマホのカメラで読む</button>
-        <button class="btn primary receive-only" id="readLocalCamera" type="button">この端末のカメラで読む</button>
+        <button class="btn send-only local-only" id="showRemoteQr" type="button" disabled>Show QR on phone</button>
+        <button class="btn primary send-only" id="showQr" type="button" disabled>Show on this screen</button>
+        <button class="btn receive-only local-only" id="readRemoteCamera" type="button" disabled>Use phone camera</button>
+        <button class="btn primary receive-only" id="readLocalCamera" type="button">Use device camera</button>
       </div>
     </footer>
   </div>
 
-  <section class="present" id="qrOverlay" role="dialog" aria-modal="true" aria-label="QR を出しています" hidden>
+  <section class="present" id="qrOverlay" role="dialog" aria-modal="true" aria-label="Displaying QR codes" hidden>
     <div class="present-stage">
       <div class="present-qr"><canvas id="qrFrame" width="1" height="1" role="img" aria-label="QR"></canvas></div>
     </div>
     <p class="qr-status" id="qrProgress" aria-live="polite"></p>
     <div class="present-bar">
       <span class="stepper">
-        <button class="step" type="button" id="smallerQr" aria-label="小さくする"></button>
+        <button class="step" type="button" id="smallerQr" aria-label="Decrease size"></button>
         <output class="step-value" id="qrSizeOutput">900 px</output>
-        <button class="step plus" type="button" id="largerQr" aria-label="大きくする"></button>
+        <button class="step plus" type="button" id="largerQr" aria-label="Increase size"></button>
       </span>
-      <button class="btn" id="closeQr" type="button">送るのをやめる</button>
+      <button class="btn" id="closeQr" type="button">Stop sending</button>
     </div>
   </section>
 
   <dialog class="dialog" id="cameraHelpDialog" aria-labelledby="cameraHelpTitle">
-    <h2 class="dialog-title" id="cameraHelpTitle">読めないとき</h2>
+    <h2 class="dialog-title" id="cameraHelpTitle">Troubleshooting</h2>
     <ul class="tips">
-      <li>送る側の「1 枚の量」を 1,465 bytes まで下げます。</li>
-      <li>それでも読めなければ、送る側を 24 fps まで下げます。</li>
-      <li>QR がカメラの視野いっぱいに入るようにして、端末を何かに立てかけます。</li>
-      <li>QR を出している画面の明るさを最大にします。</li>
+      <li>Reduce Bytes per frame to 1,465 on the sender.</li>
+      <li>If reception still fails, reduce the sender to 24 fps.</li>
+      <li>Fill the camera view with the entire QR code and rest the device on a steady surface.</li>
+      <li>Set the sending screen to maximum brightness.</li>
     </ul>
-    <div class="dialog-actions"><button class="btn primary" id="cameraHelpClose" type="button">閉じる</button></div>
+    <div class="dialog-actions"><button class="btn primary" id="cameraHelpClose" type="button">Close</button></div>
   </dialog>
 
   <dialog class="dialog" id="confirmDialog" aria-labelledby="confirmTitle">
-    <h2 class="dialog-title" id="confirmTitle">大きいファイルを送ります</h2>
+    <h2 class="dialog-title" id="confirmTitle">Send a large transfer</h2>
     <p class="dialog-text" id="confirmText"></p>
     <div class="dialog-actions">
-      <button class="btn" id="confirmCancel" type="button">やめる</button>
-      <button class="btn primary" id="confirmOk" type="button">送る</button>
+      <button class="btn" id="confirmCancel" type="button">Cancel</button>
+      <button class="btn primary" id="confirmOk" type="button">Send</button>
     </div>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <noscript>Xfer を使うには JavaScript を有効にしてください。</noscript>
+  <noscript>Enable JavaScript to use Xfer.</noscript>
 </body>
 </html>

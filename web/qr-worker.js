@@ -1,4 +1,4 @@
-/* Xfer camera decoder. The bundled ZXing-WASM 2.2.4 reader is unchanged. */
+/* Camera decoder using the bundled ZXing-WASM 2.2.4 reader. */
 "use strict";
 
 var readerReady = false;

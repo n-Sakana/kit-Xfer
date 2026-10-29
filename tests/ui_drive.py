@@ -123,6 +123,7 @@ class Mcp:
 
 
 def sample_folder(base: Path) -> Path:
+    # Unicode fixture names exercise file-list rendering.
     folder = base / "資料 2026"
     (folder / "写真").mkdir(parents=True, exist_ok=True)
     files = {
