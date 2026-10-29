@@ -91,9 +91,7 @@ dotnet run --project tests/Xfer.SmallBenchmark.csproj -c Release --artifacts-pat
 
 ## 2026-10-24 の実測
 
-Linux/.NET 9、カメラ・窓・音なし。作業先は
-`/home/sakana/data/fin/deck/workspaces/iris/xfer-nolimit-20261024/`。
-元データと復元データは試験のfinallyで削除済み。
+Linux/.NET 9、カメラ・窓・音なし。元データと復元データは試験のfinallyで削除済み。
 
 | 試験 | 結果 | 時間 | 最大RSS |
 |---|---|---:|---:|
