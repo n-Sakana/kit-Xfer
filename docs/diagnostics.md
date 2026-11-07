@@ -61,7 +61,7 @@ Frequent events are aggregated every five seconds with `count`, `totalMs`,
 do not support precise latency measurements without clock synchronization.
 
 On Windows, normal shutdown records `native.shutdown.start`, `app.stop`,
-`native.shutdown.end`, and `launcher.native_shutdown`. Shutdown codes are:
+`native.shutdown.end`, and `launcher.exit`. Native shutdown codes are:
 0 completed; 1 two-second timeout; 2 cleanup exception; 3 flush failure;
 −1 application not loaded; −2 shutdown export missing; −3 bridge missing.
 

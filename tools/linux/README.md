@@ -1,39 +1,46 @@
 # Linux setup
 
-Xfer uses the included desktop rendering libraries in `runtime/linux-x64`.
-Builds require the .NET 9 SDK. The desktop host also needs GTK 3 with X11
-support, ffmpeg, and zenity or kdialog for file selection.
+Xfer runs the bundled Rust MiniUI executable and the Native AOT App library.
+Using the desktop needs no .NET SDK, GTK host, or MiniUI source checkout.
+See [runtime components](../../runtime/README.md) for OS requirements and hashes.
 
-On NixOS, `./Xfer` enters the environment defined in `shell.nix`, builds the
-host, and starts it:
+On NixOS, `./Xfer` enters the runtime environment in `shell.nix` and starts the
+included executable. It does not build anything:
 
 ```sh
 ./Xfer --path ./input
 ```
 
-To build and start separately:
-
-```sh
-./tools/linux/build.sh
-./Xfer.sh --path ./input
-```
-
-The build output is `artifacts/miniui-linux/Xfer.dll`. The desktop loads
-`ui/index.html`. [Runtime components](../../runtime/README.md) lists the
-included libraries.
+On other Linux systems, run `./Xfer.sh --path ./input`.
+To rebuild the App, install the .NET 9 SDK, clang and zlib development files,
+then run `./tools/linux/build.sh`. On NixOS that script enters its own build
+environment. It writes `ui/app/miniui-app.so` and `runtime/linux-x64/xfer-cli`.
+The MiniUI executable is distributed as a built component.
 
 Received files go to `output/` in the application folder. Set `--output` to
 choose another location. Set `Xfer_CAMERA_DEVICE=/dev/videoN` to select a
-V4L2 capture device explicitly.
+V4L2 capture device explicitly. ffmpeg captures BGRA; the existing receiver
+automatically detects Tile and QR.
 
 Use `--window-at X,Y` to position the window in X11 pixels, `--window WxH`
-to set its size, and `--fullscreen` to start fullscreen. With both
-`--window-at` and `--fullscreen`, fullscreen starts only after the window
-reaches the requested position, with a five-second timeout.
+to set its size in CSS pixels, and `--fullscreen` to start fullscreen. `--windowed`
+keeps Tile in the window, useful when positioning it on a secondary monitor. Placement
+waits up to five seconds before entering fullscreen. Tile automatically enters fullscreen
+and Esc returns to the window. Host options include `--state-dir`, `--font-dir`,
+`--duration-ms`, `--screenshot`, and `--mcp`.
 
-Host options include `--state-dir`, `--font-dir`, `--duration-ms`,
-`--screenshot`, and `--mcp`. Use isolated state and output directories for
-scripted UI tests.
+Both desktop platforms use ABI v2 image limits: 8,192 device pixels per side
+and 33,554,432 pixels (128 MiB BGRA). Beyond that, Tile uses a centred viewport
+with the same device pixels per cell; the data is never stretched to fit.
+
+For a camera-free check against a recording of another Xfer window, set
+`Xfer_CAMERA_RECORDING=/absolute/path/screen.mkv`. The receive view lists it as
+**Recorded screen** and uses ffmpeg to replay it through the normal Tile/QR
+receiver. The recording repeats until stopped, allowing missing blocks to be
+read on later passes. Preserve all captured frames: replay cannot recover
+data that was never captured. Capture without lossy compression or resized cells;
+the capture-width setting determines the decoded picture size. Unset the
+variable to use V4L2 cameras again.
 
 ## Desktop menu
 
@@ -48,9 +55,9 @@ the current installation path. Run it again after moving the folder.
 ## HTTP app
 
 ```sh
-dotnet run --project Xfer.csproj -- --no-browser
+./Xfer.sh --no-browser
 ```
 
 Open the printed localhost URL in a browser. At the default port, Xfer uses
 Tailscale Serve on HTTPS port 10000 for phone connections. A custom `--port`
-skips Tailscale setup.
+skips Tailscale setup. `./Xfer.sh --help` prints command-line options.

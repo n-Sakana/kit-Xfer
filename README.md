@@ -24,11 +24,10 @@ On NixOS, run:
 ./Xfer --path ./input
 ```
 
-On other Linux systems, install the .NET 9 SDK, GTK 3 with X11 support, ffmpeg,
-and either zenity or kdialog, then run:
+On other Linux systems, install the OS runtime dependencies listed in
+[runtime components](runtime/README.md), then run:
 
 ```sh
-./tools/linux/build.sh
 ./Xfer.sh --path ./input
 ```
 
@@ -47,7 +46,7 @@ patches, so it can read a partially visible screen. QR requires the entire code
 to be visible. Tile sending uses fullscreen; move the pointer to the bottom edge
 or press Tab to show the controls. Press Esc to stop and restore the window.
 
-The default Tile settings are 3 px cells, 30 fps, error correction L, and no
+The default Tile settings are 3 CSS px cells (scaled to whole device pixels), 30 fps, error correction L, and no
 color layer. QR defaults to 1,000 bytes per frame, 30 fps, and error correction L.
 If reception stalls, enlarge Tile cells or enable the 2× coarse center. For QR,
 reduce the bytes per frame or frame rate. Increase the screen brightness and
@@ -83,6 +82,7 @@ On Windows, use `.\Xfer.cmd` with the same arguments. Tile is called `fx2` in
 command-line arguments and stored settings. `--send` and `--receive` start the
 requested operation when the desktop window opens. Their settings apply to that
 launch and are not saved. Run with `--help` for the full option list.
+Use `--windowed` to keep Tile in the window instead of entering fullscreen.
 
 To run the HTTP app without a desktop window:
 
@@ -96,9 +96,10 @@ Open the localhost URL printed at startup.
 
 Building requires the .NET 9 SDK. On Windows, run
 `tools\windows\build.cmd` with the Visual Studio C++ build tools installed;
-this rebuilds `ui\MiniUI.App.dll` and the launcher DLL. On Linux, use
-`tools/linux/build.sh`. The desktop rendering libraries are included under
-`runtime/`; see [runtime components](runtime/README.md).
+this rebuilds `ui\app\miniui-app.dll` (Native AOT, ABI v2). On Linux, use
+`tools/linux/build.sh`. The Rust MiniUI Core (`73d3310a`) and Windows Bridge are
+included under `runtime/` for Linux x64 and Windows x64; see
+[runtime components](runtime/README.md) for provenance and hashes.
 
 [Test instructions](tests/README.md) cover the transfer formats, desktop host,
 browser, and diagnostics. [Diagnostic logs](docs/diagnostics.md) describes log

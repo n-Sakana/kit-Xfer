@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "kit/miniUI",
+  "sourceRevision": "73d3310ac3078d7c6b52badd7537546d24c46fe3",
+  "previousSourceRevision": "ecbd80e4d5554ced637764a6eb001716ed977ff1",
+  "notices": "runtime/MiniUI-THIRD-PARTY-NOTICES.md",
+  "engines": [
+    {
+      "platform": "linux-x64",
+      "target": "x86_64-unknown-linux-gnu",
+      "path": "runtime/linux-x64/miniui",
+      "sourceRevision": "73d3310ac3078d7c6b52badd7537546d24c46fe3",
+      "bytes": 8056288,
+      "sha256": "3e80e91a32f2cfb00759274e7208c01233c5907b9962bd48aa5a46eddd235fb6",
+      "rust": "1.95.0",
+      "buildEnvironment": "Ubuntu 20.04 (glibc 2.31), MiniUI crates/tools/pack/linux.Dockerfile",
+      "builder": "crates/tools/pack/linux.py",
+      "postprocess": "strip --strip-all (same builder image)",
+      "minimumGlibc": "2.31",
+      "interpreter": "/lib64/ld-linux-x86-64.so.2",
+      "upstreamPackaging": {
+        "sizeLimitBytes": 8000000,
+        "withinSizeLimit": false,
+        "exception": "Xfer bundles the verified executable despite the upstream packaging size gate."
+      }
+    },
+    {
+      "platform": "windows-x64",
+      "target": "x86_64-pc-windows-gnu",
+      "path": "runtime/windows-x64/MiniUI.Engine.dll",
+      "sourceRevision": "73d3310ac3078d7c6b52badd7537546d24c46fe3",
+      "bytes": 8609573,
+      "sha256": "bcebf0bdae31b6404f482774495a6097b0574c7d7047a63ca1440fd7e2ac83e1",
+      "delivery": "rebuilt from the same revision on 2026-11-06"
+    }
+  ]
+}

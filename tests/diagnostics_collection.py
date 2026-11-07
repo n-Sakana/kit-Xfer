@@ -20,8 +20,8 @@ stage, work = a.stage.resolve(), a.work.resolve()
 work.mkdir(parents=True, exist_ok=True)
 root = Path(__file__).resolve().parents[1]
 assert not stage.is_relative_to(root)
-for name in ['ui', 'web', 'lib']:
-    shutil.copytree(root / name, stage / name, dirs_exist_ok=True, ignore=shutil.ignore_patterns('MiniUI.App.dll'))
+for name in ['ui', 'web', 'lib', 'runtime']:
+    shutil.copytree(root / name, stage / name, dirs_exist_ok=True)
 shutil.copy2(root / 'Xfer.sh', stage / 'Xfer.sh')
 source = work / 'input'; source.mkdir(exist_ok=True)
 (source / 'test.txt').write_text('synthetic fixture')

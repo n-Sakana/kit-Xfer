@@ -1,0 +1,14 @@
+MiniUI.Intl uses the operating system's ICU libraries and locale data through
+runtime symbol lookup. ICU libraries and locale data are not included in this
+component. ICU is covered by the Unicode/ICU license:
+https://www.unicode.org/license.txt
+
+The build uses ICU headers for function declarations and enum values only.
+The native JSON framing reuses MiniUI.Media's json.cpp; the Media part is not
+linked or required by Intl.
+
+MinGW DLL builds include GCC/libstdc++ and mingw-w64 runtime code. Static MCF
+Gthread builds use the runtime exception in MCF-LICENSE.md. The corresponding
+runtime notices and licenses must accompany distribution (see the shared Windows
+licenses shipped with the component). None of those runtimes require an extra
+DLL in the supplied static build.

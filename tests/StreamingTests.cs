@@ -80,7 +80,6 @@ namespace Xfer
                         for (int k = 0; k < batch.Length; k++)
                         {
                             Check(sender.TryFrame(started.Token, sequence, out batch[k]), "sender stopped");
-                            if (batch[k][1] == 0x0d && (sequence % (ulong)(fullBlocks * 2)) == (ulong)(fullBlocks - 1)) sequence += (ulong)fullBlocks;
                             sequence++;
                         }
                         if (cells)
@@ -180,7 +179,7 @@ namespace Xfer
             var input = Path.Combine(_root, "cases"); var output = Path.Combine(_root, "saved"); Directory.CreateDirectory(input);
             try
             {
-                for (int i = 0; i < 2001; i++) File.WriteAllText(Path.Combine(input, "f" + i.ToString("D4")), (i == 0 ? "" : new string('x', 137) + "file " + i));
+                for (int i = 0; i < 2001; i++) File.WriteAllText(Path.Combine(input, "f" + i.ToString("D4")), (i == 0 ? "" : new string('x', 9501) + "file " + i));
                 var source = FolderCatalog.Inspect(input); var names = source.Files.Select(f => f.Name).ToArray();
                 using (var sender = new OpticalService())
                 using (var receiver = new OpticalReceiveService(output))
@@ -189,17 +188,25 @@ namespace Xfer
                     Check(sender.TryFrame(start.Token, 0, out first) && first[1] == 0x0d, "2001 files did not select streaming");
                     int block = 1000 - StreamingWire.Header, full = StreamingWire.Blocks(StreamingWire.ChunkBytes, block);
                     long chunks = (start.TransmittedBytes - 1) / StreamingWire.ChunkBytes + 1;
-                    Check(chunks > 4, "test must evict live decoder windows");
+                    Check(chunks > 256, "test must evict live decoder windows");
+                    var systematic = new List<byte[]>[chunks];
+                    for (int i = 0; i < systematic.Length; i++) systematic[i] = new List<byte[]>();
+                    long collected = 0;
+                    for (ulong seq = 0; collected < start.SourceBlocks; seq++)
+                    {
+                        byte[] f; sender.TryFrame(start.Token, seq, out f);
+                        StreamingFrame collectedFrame; Check(StreamingFrame.TryParse(f, out collectedFrame), "streaming header changed");
+                        if (collectedFrame.Sequence < collectedFrame.Blocks) { systematic[collectedFrame.Chunk].Add(f); collected++; }
+                    }
                     OpticalReceiveResult result = null;
                     // Force cache eviction with one missing systematic block in every window, then repair on
                     // the next sweep. Reverse each window and duplicate packets.
                     for (int pass = 0; pass < 2; pass++)
                     for (long chunk = 0; chunk < chunks; chunk++)
-                    for (int j = full - 1; j >= 0; j--)
+                    for (int j = systematic[chunk].Count - 1; j >= 0; j--)
                     {
                         if (pass == 0 && j == 0) continue;
-                        ulong seq = (ulong)((pass * chunks + chunk) * full * 2 + j);
-                        byte[] frame; sender.TryFrame(start.Token, seq, out frame);
+                        byte[] frame = systematic[chunk][j];
                         result = receiver.AddFrame("many", frame, false);
                         receiver.AddFrame("many", frame, false);
                         if (result.Complete) break;
@@ -227,7 +234,7 @@ namespace Xfer
                     try
                     {
                         receiver.AddFrame("bad", damaged, false);
-                        for (ulong seq = 1; seq < (ulong)full; seq++) { byte[] f; sender.TryFrame(start.Token, seq, out f); receiver.AddFrame("bad", f, false); }
+                        for (int j = 1; j < systematic[0].Count; j++) receiver.AddFrame("bad", systematic[0][j], false);
                     }
                     catch (InvalidDataException) { rejected = true; }
                     Check(rejected && !Directory.GetDirectories(output, ".xfer-*").Any(), "corrupt window was published or leaked staging");
@@ -241,22 +248,128 @@ namespace Xfer
                     Check(qr != null, "streaming QR decode failed");
                     Console.WriteLine("PASS streaming QR raster roundtrip");
                 }
-                // Fountain parity recovers missing systematic frames inside a bounded window.
+                // Three non-singleton equations form a full-rank system that sparse peeling cannot start.
+                var algebraBytes = new byte[] { 7, 29, 66 };
+                var algebraEncoder = new FountainEncoder(algebraBytes, 1, 17);
+                var linear = new FountainDecoder(3, 1, 17, 3, true);
+                var peeling = new FountainDecoder(3, 1, 17, 3);
+                var wanted = new HashSet<int>(new[] { 3, 6, 7 });
+                var cdf = FountainMath.SolitonCdf(3);
+                for (uint seq = 0; wanted.Count > 0; seq++)
+                {
+                    int mask = 0; foreach (int index in FountainMath.FrameIndices(3, cdf, 17, seq)) mask |= 1 << index;
+                    if (!wanted.Remove(mask)) continue;
+                    byte[] f = algebraEncoder.Encode(seq); linear.AddFrame(seq, f); peeling.AddFrame(seq, f);
+                }
+                Check(linear.IsComplete && linear.Assemble().SequenceEqual(algebraBytes) && peeling.SolvedCount == 0,
+                    "independent repair equations were not solved");
+                Console.WriteLine("PASS full-rank repair without a singleton or systematic frame");
+                // Camera erasures combine a missing patch row or a fixed column, dropped pictures, random losses,
+                // duplicate readings and reverse worker completion within each picture.
+                foreach (bool column in new[] { false, true })
                 using (var bundle = new StreamingBundle(source, names))
-                using (var encoder = new StreamingEncoder(bundle, 1000))
+                using (var encoder = new StreamingEncoder(bundle, 245))
                 using (var receiver = new OpticalReceiveService(Path.Combine(output, "parity")))
                 {
-                    int full = StreamingWire.Blocks(StreamingWire.ChunkBytes, 1000 - StreamingWire.Header);
+                    int full = StreamingWire.Blocks(StreamingWire.ChunkBytes, 245 - StreamingWire.Header);
                     long chunks = (bundle.Length - 1) / StreamingWire.ChunkBytes + 1;
+                    ulong firstCycle = (ulong)(chunks * full * 3);
+                    firstCycle += firstCycle / 9;
+                    var random = new Random(731);
                     OpticalReceiveResult p = null;
-                    for (ulong seq = 0; seq < (ulong)(chunks * full * 8); seq++)
-                    { if (seq % 13 == 0) continue; p = receiver.AddFrame("parity", encoder.Frame(seq), false); if (p.Complete) break; }
-                    Check(p != null && p.Complete, "loss recovery failed"); Console.WriteLine("PASS fountain loss recovery");
+                    for (ulong picture = 0; picture < firstCycle && (p == null || !p.Complete); picture += 72)
+                    for (int patch = 71; patch >= 0; patch--)
+                    {
+                        ulong seq = picture + (ulong)patch;
+                        if (seq >= firstCycle || (column ? patch % 8 == 0 : patch < 12) || picture / 72 % 19 == 5 || picture / 72 % 500 < 90 || random.Next(100) < 25) continue;
+                        byte[] frame = encoder.Frame(seq);
+                        p = receiver.AddFrame("parity", frame, false);
+                        if (p.Complete) break;
+                        receiver.AddFrame("parity", frame, false);
+                    }
+                    Check(p != null && p.Complete && p.FileCount == names.Length, "camera losses required another whole-file sweep");
+                    foreach (string name in names) Check(Hash(Path.Combine(p.OutputPath, name)) == Hash(Path.Combine(input, name)), "loss recovery SHA256 mismatch");
+                    Console.WriteLine("PASS first-cycle SHA256 with missing patch " + (column ? "column" : "row") + ", dropped pictures and 3-second bursts, 25% random loss, duplicates and reordering");
+                }
+                // Keep one block missing after its main group has ended. Only background repair
+                // may fill that gap; the normal pass must not wrap back to the segment.
+                using (var bundle = new StreamingBundle(source, names))
+                using (var encoder = new StreamingEncoder(bundle, 245))
+                using (var receiver = new OpticalReceiveService(Path.Combine(output, "background")))
+                {
+                    int full = StreamingWire.Blocks(StreamingWire.ChunkBytes, 197);
+                    ulong firstCycle = (ulong)(((bundle.Length - 1) / StreamingWire.ChunkBytes + 1) * full * 3);
+                    firstCycle += firstCycle / 9;
+                    bool laterGroup = false, backgroundRepaired = false;
+                    OpticalReceiveResult result = null;
+                    for (ulong seq = 0; seq < firstCycle && (result == null || !result.Complete); seq++)
+                    {
+                        byte[] bytes = encoder.Frame(seq); StreamingFrame frame;
+                        Check(StreamingFrame.TryParse(bytes, out frame), "background header changed");
+                        if (frame.Chunk >= 256) laterGroup = true;
+                        if (frame.Chunk == 0 && (frame.Sequence == 0 || frame.Sequence >= frame.Blocks))
+                        {
+                            if (!laterGroup || seq % 10 != 9) continue;
+                            backgroundRepaired = true;
+                        }
+                        result = receiver.AddFrame("background", bytes, false);
+                    }
+                    Check(backgroundRepaired && result != null && result.Complete, "late gap waited for a whole-file wrap");
+                    foreach (string name in names) Check(Hash(Path.Combine(result.OutputPath, name)) == Hash(Path.Combine(input, name)), "background repair SHA256 mismatch");
+                    Console.WriteLine("PASS checkpointed late gap repaired before whole-file wrap, SHA256 matches");
                 }
             }
             finally { if (Directory.Exists(input)) Directory.Delete(input, true); if (Directory.Exists(output)) Directory.Delete(output, true); }
             BundleValidation();
+            SizePolicy();
             Transfer(9 * 1024 * 1024, false);
+        }
+        private static void SizePolicy()
+        {
+            string input = Path.Combine(_root, "size-policy"), output = Path.Combine(_root, "size-policy-output");
+            Directory.CreateDirectory(input);
+            string path = Path.Combine(input, "size.bin");
+            try
+            {
+                using (var sender = new OpticalService())
+                using (var receiver = new OpticalReceiveService(output))
+                foreach (long size in new[] { (long)OpticalTransferLimits.StreamingThresholdBytes,
+                    OpticalTransferLimits.StreamingThresholdBytes + 1L,
+                    OpticalTransferLimits.MaximumPayloadBytes + 1L, 267512174L })
+                {
+                    using (var file = File.OpenWrite(path)) file.SetLength(size);
+                    var source = FolderCatalog.Inspect(input);
+                    foreach (bool tile in new[] { false, true })
+                    {
+                        var start = tile ? sender.StartFx2(source, new[] { "size.bin" }, 30, "L")
+                            : sender.Start(source, new[] { "size.bin" }, 1000, 30, "L");
+                        byte[] first;
+                        Check(sender.TryFrame(start.Token, 0, out first), "missing first frame");
+                        bool streaming = size > OpticalTransferLimits.StreamingThresholdBytes;
+                        Check(first[1] == (streaming ? 0x0d : 0x0c), "wrong format at size boundary");
+                        var accepted = receiver.AddFrame("size", first, false);
+                        Check(accepted.Recognized && accepted.TotalBytes == start.TransmittedBytes,
+                            "sender emitted a size the receiver cannot accept");
+                        if (!streaming)
+                        {
+                            // Only the header changes: test rejection before any transfer-sized allocation.
+                            var boundary = (byte[])first.Clone();
+                            int length = OpticalTransferLimits.MaximumContainerBytes;
+                            int block = BitConverter.ToUInt16(boundary, 10);
+                            StreamingWire.Put(boundary, 12, BitConverter.GetBytes((uint)length));
+                            StreamingWire.Put(boundary, 8, BitConverter.GetBytes(unchecked((ushort)StreamingWire.Blocks(length, block))));
+                            OpticalFrame parsed;
+                            Check(OpticalFrame.TryParse(boundary, out parsed), "buffered limit boundary rejected");
+                            StreamingWire.Put(boundary, 12, BitConverter.GetBytes((uint)(length + 1)));
+                            Check(!OpticalFrame.TryParse(boundary, out parsed), "oversize buffered frame accepted");
+                        }
+                        receiver.Reset("size"); sender.Stop(start.Token);
+                    }
+                }
+                Console.WriteLine("PASS QR/Tile size policy: 8 MiB, 8 MiB + 1, 64 MiB + 1, 267512174 bytes; buffered header boundary");
+                Check(!Directory.GetDirectories(output, ".xfer-*").Any(), "size-policy staging leaked");
+            }
+            finally { Directory.Delete(input, true); if (Directory.Exists(output)) Directory.Delete(output, true); }
         }
         private static void BundleValidation()
         {

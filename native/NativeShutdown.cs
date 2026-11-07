@@ -9,7 +9,7 @@ namespace Xfer
         private static Task<int> _finish;
 
         // Native AOT DLLs do not receive the launcher's managed ProcessExit event.
-        // The launcher calls this after MiniUI.Run returns; normal transfer calls never wait here.
+        // ABI v2 shutdown calls this when the document closes; transfer calls never wait here.
         public static int Finish(int timeoutMilliseconds)
         {
             Task<int> finish;

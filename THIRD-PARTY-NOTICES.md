@@ -45,13 +45,13 @@ The QR decoding engine used by the included zxing-wasm library.
 
 ## .NET runtime
 
-`runtime/windows-x64/MiniUI.Engine.dll` and `ui/MiniUI.App.dll` contain
+`ui/app/miniui-app.so` and `ui/app/miniui-app.dll` contain
 parts of the .NET 9 runtime, statically linked by Native AOT.
 
 - Project: [dotnet/runtime](https://github.com/dotnet/runtime)
 - License: MIT
 - Copyright (c) .NET Foundation and Contributors
-- License text: [rendering library notices](runtime/MiniUI-THIRD-PARTY-NOTICES.md)
+- License text: [runtime license](lib/LICENSE-dotnet-runtime.txt)
 
 ## Inter
 

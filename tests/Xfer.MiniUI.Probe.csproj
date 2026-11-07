@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Loopback test of the desktop optical path (QrStream -> ScaledQr -> CameraReceiver -> received files).
-       Builds the Linux host with the MiniUI DLLs bundled in runtime/linux-x64. -->
+       Uses Xfer's managed app classes; the Rust host is checked through stdio MCP. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems><Nullable>enable</Nullable>

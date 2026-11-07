@@ -32,6 +32,7 @@ dotnet run --project tests/Xfer.Fx2Color.csproj -c Release
 dotnet run --project tests/Xfer.Headless.Probe.csproj -c Release
 dotnet run --project tests/Xfer.MiniUI.Probe.csproj -c Release
 dotnet run --project tests/Xfer.FocusHold.csproj -c Release
+dotnet run --project tests/Xfer.Display.csproj -c Release -- selftest /path/to/display-test
 ```
 
 Fx2Lab checks marker codes, orientation, parity, layouts, tracking, and patch
@@ -46,9 +47,22 @@ dotnet run --project tests/Xfer.Fx2Lab.csproj -c Release -- pgm /path/to/frames 
 
 The headless and desktop probes send QR and Tile images through the native
 receiver and compare received files with the originals. They use synthetic
-camera images. The desktop probe links the included Linux rendering libraries.
+camera images. The desktop probe links Xfer's managed app classes; native Rust UI checks use stdio MCP.
 FocusHold tests temporary focus locking, restoration, unsupported devices,
 control failures, and worker/shutdown races without a physical camera.
+
+Display tests the native image endpoint against both platforms' ABI v2
+128 MiB image budget, including full 6,144×3,456 images, exact budget boundaries,
+oversized screens, QR switching, and file equality after reconstruction.
+It can also reconstruct files from actual UI screenshots saved as 8-bit PGM
+(P5, width and height on one line, maximum value 255):
+
+```sh
+dotnet run --project tests/Xfer.Display.csproj -c Release -- decode /path/to/pgm /path/to/source /path/to/received
+```
+
+Run desktop UI capture on an isolated display and session bus, with separate
+state, output and log directories and an unused custom HTTP port.
 
 [Camera tools](camera.md) documents the Windows capture utility.
 `receive_report.py TRACE_OR_FOLDER [--table]` summarizes diagnostic traces,
@@ -59,6 +73,7 @@ ten seconds of five-second buckets with no more than five new frames each.
 
 ```sh
 dotnet run --project tests/Xfer.Streaming.csproj -c Release -- /path/to/work selftest
+dotnet run --project tests/Xfer.Streaming.csproj -c Release -- /path/to/work fx2 267512174
 dotnet run --project tests/Xfer.Streaming.csproj -c Release -- /path/to/work fx2 2147549185
 dotnet run --project tests/Xfer.Streaming.csproj -c Release -- /path/to/work picture 73400320
 dotnet run --project tests/Xfer.SmallBenchmark.csproj -c Release -- /path/to/work
@@ -66,7 +81,14 @@ dotnet run --project tests/Xfer.SmallBenchmark.csproj -c Release -- /path/to/wor
 
 Use a work directory outside the repository. `selftest` checks 2,001 files,
 checkpointing and repair, duplicates and reordering, 64-bit metadata, QR
-round trips, corruption and invalid paths, and cleanup. `fx2` passes all bytes
+round trips, corruption and invalid paths, cleanup, and QR/Tile format selection
+at 8 MiB, 8 MiB + 1, 64 MiB + 1, and 267,512,174 bytes. It also checks the
+buffered frame size boundary, full-rank repair without singleton equations,
+and first-cycle SHA-256 recovery with a missing Tile patch row or fixed column, dropped screen
+pictures and three-second bursts at 30 fps, 25% random loss, duplicate frames and reversed worker completion.
+It also leaves one old block missing through decoder eviction, and requires
+background repair and matching SHA-256 before the main pass wraps.
+`fx2` passes all bytes
 through cell encoding and decoding; `picture` also uses full raster images and
 marker detection. Both require matching SHA-256 hashes. These are synthetic
 throughput tests without a physical camera or a display frame-rate limit.

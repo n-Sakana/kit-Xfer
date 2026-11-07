@@ -20,14 +20,21 @@ namespace Xfer
         private string _error, _errorTail = "";
         private long _frames;
         private readonly V4l2FocusControl _focus;
+        private readonly bool _recording;
 
-        public FfmpegCamera(string device, int width, int fps)
+        public FfmpegCamera(string device, int width, int fps, bool recording = false)
         {
-            if (device == null || !Regex.IsMatch(device, @"^/dev/video[0-9]+$")) throw new ArgumentException("Specify the camera as /dev/videoN.");
+            if (recording)
+            {
+                device = Path.GetFullPath(device);
+                if (!File.Exists(device)) throw new FileNotFoundException("Screen recording was not found.", device);
+            }
+            else if (device == null || !Regex.IsMatch(device, @"^/dev/video[0-9]+$")) throw new ArgumentException("Specify the camera as /dev/videoN.");
+            _recording = recording;
             _device = device; _fps = fps;
-            _focus = new V4l2FocusControl(device);
+            _focus = recording ? null : new V4l2FocusControl(device);
             Width = width; Height = width * 9 / 16;
-            Name = DeviceName(device);
+            Name = recording ? "Recorded screen" : DeviceName(device);
         }
 
         public string Name { get; private set; }
@@ -46,16 +53,18 @@ namespace Xfer
         public string Error { get { lock (_gate) return _error; } }
         public bool Running { get { return !_stopped && Error == null; } }
 
-        public void HoldFocus() { if (!_stopped && _process != null) _focus.Hold(); }
-        public void ReleaseFocus() { _focus.Release(); }
+        public void HoldFocus() { if (!_stopped && _process != null) _focus?.Hold(); }
+        public void ReleaseFocus() { _focus?.Release(); }
 
         public void Start(Action<byte[], int, int> frame)
         {
             var info = new ProcessStartInfo("ffmpeg") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             string size = Width.ToString(CultureInfo.InvariantCulture) + "x" + Height.ToString(CultureInfo.InvariantCulture);
             string fit = string.Format(CultureInfo.InvariantCulture, "scale={0}:{1}:force_original_aspect_ratio=decrease,pad={0}:{1}:(ow-iw)/2:(oh-ih)/2", Width, Height);
-            foreach (string arg in new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "v4l2", "-framerate", _fps.ToString(CultureInfo.InvariantCulture),
-                "-video_size", size, "-i", _device, "-an", "-vf", fit, "-pix_fmt", "bgra", "-f", "rawvideo", "pipe:1" })
+            foreach (string arg in new[] { "-hide_banner", "-loglevel", "error", "-nostdin" }) info.ArgumentList.Add(arg);
+            foreach (string arg in _recording ? new[] { "-stream_loop", "-1", "-re" } : new[] { "-f", "v4l2", "-framerate", _fps.ToString(CultureInfo.InvariantCulture), "-video_size", size })
+                info.ArgumentList.Add(arg);
+            foreach (string arg in new[] { "-i", _device, "-an", "-vf", fit, "-pix_fmt", "bgra", "-f", "rawvideo", "pipe:1" })
                 info.ArgumentList.Add(arg);
             try { _process = Process.Start(info); }
             catch (Exception error) { Diagnostics.Failure("camera.ffmpeg.start", "native", error); throw new InvalidOperationException("Could not start ffmpeg. Check that it is installed."); }
@@ -94,7 +103,7 @@ namespace Xfer
                 lock (_gate) tail = _errorTail.Trim();
                 lock (_gate) _error = "The camera stopped delivering frames. Check the camera, capture width, and frame rate." + (tail.Length > 0 ? " (" + tail + ")" : "");
             }
-            finally { _focus.Dispose(); }
+            finally { _focus?.Dispose(); }
         }
 
         private void ReadErrors()
@@ -133,7 +142,7 @@ namespace Xfer
         public void Dispose()
         {
             _stopped = true;
-            _focus.Dispose();
+            _focus?.Dispose();
             var process = _process;
             if (process == null) return;
             try { if (!process.HasExited) process.Kill(true); } catch (Exception) { }

@@ -17,12 +17,35 @@
   var DEFAULT_CAMERA_WIDTH = 1920, DEFAULT_WORKERS = 3;
   var EC_LIMIT = { L: 2953, M: 2331, Q: 1663, H: 1273 };
 
+  // Window options belong to the host; transfer options go to Xfer's native app.
+  var launchArguments = [], launchFullscreen = false, launchPosition = null, launchSize = null, launchPresentationAllowed = true;
+  for (var launchIndex = 0; launchIndex < miniui.arguments.length; launchIndex++) {
+    var launchOption = miniui.arguments[launchIndex];
+    if (launchOption === "--fullscreen") launchFullscreen = true;
+    else if (launchOption === "--windowed") launchPresentationAllowed = false;
+    else if (launchOption === "--window-at" || launchOption === "--window") {
+      var launchValue = miniui.arguments[++launchIndex] || "";
+      var launchPattern = launchOption === "--window-at" ? /^(-?\d+),(-?\d+)$/ : /^(\d+)x(\d+)$/;
+      var launchPair = launchPattern.exec(launchValue);
+      if (!launchPair) throw new Error("Invalid " + launchOption + ": " + launchValue);
+      if (launchOption === "--window-at") {
+        launchPosition = { x: Number(launchPair[1]), y: Number(launchPair[2]) };
+      }
+      else launchSize = { width: Number(launchPair[1]), height: Number(launchPair[2]) };
+    } else launchArguments.push(launchOption);
+  }
+  // Size first: resizing on a small secondary monitor can move the window back
+  // onto the primary monitor. Apply the requested position after that resize,
+  // regardless of the order of the command-line options.
+  if (launchSize) miniui.window.resizeTo(launchSize.width, launchSize.height);
+  if (launchPosition) miniui.window.moveTo(launchPosition.x, launchPosition.y);
+
   // ---------------------------------------------------------------- native component
 
   function native(op, args) {
     var request = { op: op };
     if (args) for (var key in args) request[key] = args[key];
-    var reply = JSON.parse(uiHost.call(JSON.stringify(request)));
+    var reply = JSON.parse(miniui.app.call(JSON.stringify(request)));
     if (reply && reply.error) throw new Error(reply.error);
     return reply;
   }
@@ -474,7 +497,7 @@
     $("present").classList.toggle("is-fx2", state.sending.fx2);
     $("present").hidden = false;
     $("presentBar").style.opacity = "";
-    native("send.presentation", { fullscreen: state.sending.fx2 });
+    miniui.window.setFullscreen(launchFullscreen || (state.sending.fx2 && launchPresentationAllowed));
     sizePresentation();
     requestAnimationFrame(tick);
     if (state.sending.fx2) $("present").focus(); else $("stopQr").focus();
@@ -492,9 +515,9 @@
     diagnosticFrames++;
     // Measurements may draw the picture as a trapezoid (thousandths of the size).
     var keystone = (setting("keystoneX", 0) ? "&kx=" + setting("keystoneX", 0) * 10 : "") + (setting("keystoneY", 0) ? "&ky=" + setting("keystoneY", 0) * 10 : "");
-    $("presentImage").src = s.fx2
-      ? "app:fx2?t=" + s.session.token + "&s=" + s.sequence + "&w=" + s.width + "&h=" + s.height + "&m=" + s.cell + "&k=" + s.coarse + keystone
-      : "app:qr?t=" + s.session.token + "&s=" + s.sequence + "&m=" + s.scale + "&c=" + (s.session.columns || 1) + "&r=" + (s.session.rows || 1) + keystone;
+    $("presentImage").src = miniui.app.imageUrl(s.fx2
+      ? "fx2?t=" + s.session.token + "&s=" + s.sequence + "&w=" + s.width + "&h=" + s.height + "&m=" + s.cell + "&k=" + s.coarse + keystone
+      : "qr?t=" + s.session.token + "&s=" + s.sequence + "&m=" + s.scale + "&c=" + (s.session.columns || 1) + "&r=" + (s.session.rows || 1) + keystone);
   }
 
   // The window's size and pixel ratio as the presentation was laid out for them.
@@ -518,8 +541,8 @@
   // The QR image has whole device pixels per module and is placed on whole device pixels, so it is drawn one
   // image pixel per screen pixel: every module keeps the same sharp size. "QR size" is the size of one code;
   // several codes side by side shrink together when the window is too narrow for them.
-  // Tile fills the window, from its top-left corner (whole device pixels), one image pixel per screen
-  // pixel; the layout of that size says how many patches (sequence numbers) each picture carries.
+  // Tile uses one image pixel per screen pixel, with its origin on whole device pixels.
+  // The host bounds oversized windows to a centred viewport and reports that raster's patch count.
   function sizeFx2() {
     // Controls overlay the data and hide while the pointer is away from the bottom edge.
     var s = state.sending, ratio = window.devicePixelRatio || 1, bar = 34;
@@ -528,14 +551,16 @@
     s.cell = cell(); // the same CSS size on a screen of another pixel ratio
     try {
       var layout = native("send.fx2layout", { width: s.width, height: s.height, cell: s.cell, coarse: s.coarse });
+      s.width = layout.width;
+      s.height = layout.height;
       s.patches = layout.patches;
     } catch (error) { fail(error); stopSending(); return; }
     var frame = $("presentFrame"), image = $("presentImage");
-    frame.style.left = "0px";
-    frame.style.top = "0px";
+    frame.style.left = Math.floor((window.innerWidth * ratio - s.width) / 2) / ratio + "px";
+    frame.style.top = Math.floor((window.innerHeight * ratio - s.height) / 2) / ratio + "px";
     image.style.width = s.width / ratio + "px";
     image.style.height = s.height / ratio + "px";
-    $("presentBar").style.top = (s.height / ratio - bar) + "px";
+    $("presentBar").style.top = (Math.floor(window.innerHeight * ratio) / ratio - bar) + "px";
     showFrame();
     $("presentSize").textContent = "Cell " + cellShown() + " px";
     $("presentSmaller").disabled = cellShown() <= 1;
@@ -574,7 +599,7 @@
   function stopSending() {
     if (!state.sending) return;
     state.sending = null;
-    native("send.presentation", { fullscreen: false });
+    miniui.window.setFullscreen(launchFullscreen);
     $("present").hidden = true;
     try { native("send.stop"); } catch (error) { /* the session ends with the window anyway */ }
     $("showQr").focus();
@@ -704,7 +729,7 @@
     try { status = native("receive.status"); } catch (error) { stopReceiving(true); fail(error); return; }
     if (status.previewSequence !== camera.preview && status.previewSequence > 0) {
       camera.preview = status.previewSequence;
-      $("previewImage").src = "app:camera?n=" + camera.preview;
+      $("previewImage").src = miniui.app.imageUrl("camera?n=" + camera.preview);
     }
     if (status.width && (status.width !== camera.width || status.height !== camera.height)) {
       camera.width = status.width;
@@ -769,7 +794,7 @@
       // Whole device pixels per module, about 180 px wide.
       var image = $("pairQr"), ratio = window.devicePixelRatio || 1;
       var scale = Math.max(1, Math.floor(180 * ratio / entry.side));
-      image.src = "app:pairing?m=" + scale + "&u=" + encodeURIComponent(entry.url);
+      image.src = miniui.app.imageUrl("pairing?m=" + scale + "&u=" + encodeURIComponent(entry.url));
       image.style.width = entry.side * scale / ratio + "px";
       image.style.height = entry.side * scale / ratio + "px";
       image.parentNode.classList.add("is-ready");
@@ -867,7 +892,7 @@
     applyTheme(stored("theme", "dark") === "light" ? "light" : "dark");
     sidebar.style.width = sidebarWidth(stored("sidebar", 224)) + "px";
     try {
-      state.info = native("init", { args: uiHost.arguments });
+      state.info = native("init", { args: launchArguments });
       $("outputPath").textContent = state.info.outputRoot;
       $("outputPath").title = state.info.outputRoot;
       loadFolder();
@@ -925,5 +950,23 @@
     if (!state.camera) startReceiving();
   }
 
-  loadSaved().then(start);
+  loadSaved().then(function () {
+    if (!launchPosition) return;
+    return new Promise(function (resolve) {
+      var deadline = Date.now() + 5000;
+      (function placed() {
+        var bounds = miniui.window.getBounds();
+        if (Math.abs(bounds.x - launchPosition.x) <= 64 && Math.abs(bounds.y - launchPosition.y) <= 64) resolve();
+        else if (Date.now() >= deadline) {
+          launchFullscreen = false;
+          launchPresentationAllowed = false;
+          console.error("--window-at: the window did not reach the requested position; not going fullscreen.");
+          resolve();
+        } else setTimeout(placed, 50);
+      })();
+    });
+  }).then(function () {
+    if (launchFullscreen) miniui.window.setFullscreen(true);
+    start();
+  });
 })();

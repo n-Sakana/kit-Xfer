@@ -12,6 +12,12 @@ namespace Xfer
         private static List<CameraInfo> Cameras()
         {
             var cameras = new List<CameraInfo>();
+            string recording = Environment.GetEnvironmentVariable("Xfer_CAMERA_RECORDING");
+            if (!string.IsNullOrWhiteSpace(recording))
+            {
+                cameras.Add(new CameraInfo(recording, "Recorded screen"));
+                return cameras;
+            }
             string chosen = Environment.GetEnvironmentVariable("Xfer_CAMERA_DEVICE");
             if (!string.IsNullOrWhiteSpace(chosen))
             {
@@ -48,7 +54,8 @@ namespace Xfer
                 if (cameras.Count == 0) throw new InvalidOperationException("No camera was found.");
                 id = cameras[0].Id;
             }
-            return new FfmpegCamera(id, width, fps);
+            return new FfmpegCamera(id, width, fps,
+                !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("Xfer_CAMERA_RECORDING")));
         }
     }
 }

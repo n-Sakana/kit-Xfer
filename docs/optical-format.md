@@ -5,7 +5,9 @@ receiver detects either layout; the phone web app supports QR only.
 
 ## Tile
 
-Tile fills the display with cells. Position markers occur every 48 cells. Each
+Tile fills the display with cells within the host's image limits. Larger displays
+use a centred viewport at the same device pixels per cell (see
+[Linux image limits](../tools/linux/README.md)). Position markers occur every 48 cells. Each
 marker has a black 3×3 center, a white border, and an encoded ID ring. Four
 markers enclose a patch containing one fountain frame, a CRC-32 checksum, and
 Reed-Solomon parity. Patches decode independently, including in a partial or
@@ -28,12 +30,27 @@ the streaming format for both QR and Tile. These thresholds select a format;
 they do not impose a transfer size limit. Both endpoints must support the
 selected format.
 
+The buffered receiver retains a 64 MiB content limit, a 1 MiB manifest limit,
+and a 65 MiB + 64 KiB container limit because it assembles and decompresses
+the whole bundle in memory. `OpticalTransferLimits` defines these limits for
+both desktop endpoints. The sender chooses streaming before reaching them
+and checks the final buffered container before starting a display. A file of
+267,512,174 bytes therefore uses the existing streaming format; the buffered
+64 MiB limit does not apply to it. Streaming has no application content-size
+cap beyond the length representation and available storage.
+The sender's `send.ready` diagnostic event records `streaming` explicitly so
+the selected receive path can be identified without guessing from file size.
+
 Streaming preparation hashes each source file with SHA-256. Display reads the
-source files in 64 KiB segments without creating a full in-memory bundle or
+source files in 64 KiB segments, caching at most 129 segments (128 for the main pass
+and one for background repair) without creating a full in-memory bundle or
 a temporary copy. Changes to a file's size or modification time during sending
 are rejected. Streaming content is not compressed.
 
-The receiver keeps at most four active fountain segment decoders in memory.
+The receiver keeps at most 256 active fountain segment decoders in memory:
+the current group of at most 128 segments and late camera readings of the preceding group.
+It reduces binary equations, so independent repair frames can reconstruct a gap
+even when no single-block equation is available to start sparse peeling.
 It stores completed segments, known blocks, and completion flags on disk.
 Eviction discards unresolved equations and preserves solved blocks for later
 passes. Once all segments are present, the receiver extracts files and checks
@@ -66,10 +83,29 @@ the selected error correction level.
 | 46 | 2 | Reserved; zero |
 
 Segments contain 65,536 bytes except for the final segment. If a full segment
-has B blocks, the sender allocates 2B display frames to it. The initial frames
-carry systematic blocks; subsequent frames carry fountain repair blocks. For
+has B blocks, the sender allocates 3B main-pass frames to it. Groups of up
+to 128 adjacent segments are interleaved, spreading a missed camera picture
+across the group rather than losing a large part of one segment. Group sizes
+differ by at most one segment so a short tail does not lose this time diversity. Each segment's
+position rotates between stripes so fixed unreadable screen locations do not
+always erase the same segment. Initial frames carry systematic blocks;
+subsequent frames carry fountain repair blocks. For
 a repair frame, subtract the segment's block count from its frame number to
-obtain the fountain sequence. After the last segment, the sender repeats the
+obtain the fountain sequence. The sender selects existing fountain sequence
+numbers whose equations cover between one third and two thirds of the segment's
+blocks (rounded down, with at least one block). This avoids leaving isolated
+blocks untouched by repair frames. The header, seed, coefficient calculation,
+QR identifiers and Tile `fx2` identifier are unchanged. Receivers that only use
+sparse peeling can interpret these frames but may need additional passes;
+update both endpoints for the reduced-equation receiver.
+One out of every ten displayed frames instead supplies a new dense repair equation
+for an earlier segment, cycling through the prefix already passed by the main
+schedule. Before that prefix exists it repairs the current group; after the first
+wrap it covers the whole bundle. This fills small checkpointed gaps while new data
+continues, rather than waiting for that segment's next whole-file pass. The main
+pass uses the remaining nine frames, so its displayed duration increases by about
+one ninth. Large gaps can still require later main passes if too few equations arrive.
+After the last segment, the sender repeats the
 bundle using different repair frames. A receiver can join mid-transfer or
 recover missing blocks on later passes.
 

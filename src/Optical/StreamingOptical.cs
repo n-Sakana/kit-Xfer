@@ -22,7 +22,7 @@ namespace Xfer
         public static int Blocks(int bytes, int block) { return (bytes + block - 1) / block; }
     }
 
-    // Metadata stays small; file bodies are read directly from their original files, one window at a time.
+    // Metadata stays small; file bodies are read directly from their original files in bounded windows.
     // Hashing is a streaming preparation pass, so modified files cannot be silently published by the receiver.
     internal sealed class StreamingBundle : IDisposable
     {
@@ -95,19 +95,29 @@ namespace Xfer
     {
         private readonly StreamingBundle _bundle;
         private readonly byte[] _id = Guid.NewGuid().ToByteArray();
-        private readonly int _frameBytes, _block, _fullBlocks;
-        private readonly long _chunks;
+        private readonly int _frameBytes, _block, _fullBlocks, _framesPerSegment;
+        private readonly long _chunks, _largerSpan;
+        private readonly int _groupSize;
         private readonly object _gate = new object();
-        private long _cached = -1;
-        private byte[] _bytes;
-        private FountainEncoder _encoder;
-        private uint _hash;
+        private sealed class Segment
+        { public long Chunk; public byte[] Bytes; public FountainEncoder Encoder; public uint Hash; }
+        private readonly Segment[] _segments = new Segment[128];
+        private Segment _repairSegment;
+        private readonly Dictionary<int, uint[]> _repairFrames = new Dictionary<int, uint[]>();
+        private ulong _repairRound = ulong.MaxValue;
+        private ulong _backgroundRound = ulong.MaxValue;
+        private int _backgroundBlocks;
+        private uint _backgroundFrame;
         private bool _disposed;
         public StreamingEncoder(StreamingBundle bundle, int frameBytes)
         {
             _bundle = bundle; _frameBytes = frameBytes; _block = frameBytes - StreamingWire.Header;
             _fullBlocks = StreamingWire.Blocks(StreamingWire.ChunkBytes, _block);
+            _framesPerSegment = _fullBlocks * 3;
             _chunks = (bundle.Length - 1) / StreamingWire.ChunkBytes + 1;
+            long groups = (_chunks - 1) / _segments.Length + 1;
+            _groupSize = (int)(_chunks / groups);
+            _largerSpan = (_chunks % groups) * (_groupSize + 1);
         }
         public long Blocks { get { return checked((_chunks - 1) * _fullBlocks + StreamingWire.Blocks((int)(_bundle.Length - (_chunks - 1) * StreamingWire.ChunkBytes), _block)); } }
         public string Id { get { return new Guid(_id).ToString("N"); } }
@@ -116,19 +126,69 @@ namespace Xfer
             lock (_gate)
             {
                 if (_disposed) throw new ObjectDisposedException("StreamingEncoder");
-                ulong slot = sequence / (ulong)(_fullBlocks * 2);
-                long chunk = (long)(slot % (ulong)_chunks);
+                bool repair = sequence % 10 == 9;
+                ulong mainSequence = sequence - sequence / 10;
+                ulong slot = mainSequence / (ulong)_framesPerSegment;
+                long position = (long)(slot % (ulong)_chunks);
+                // Balance groups so a short final group has the same camera-loss tolerance.
+                int members = position < _largerSpan ? _groupSize + 1 : _groupSize;
+                long groupStart = position < _largerSpan ? 0 : _largerSpan;
+                long group = groupStart + (position - groupStart) / members * members;
                 ulong round = slot / (ulong)_chunks;
-                int within = (int)(sequence % (ulong)(_fullBlocks * 2));
-                if (_cached != chunk)
+                ulong paired = (ulong)(position - group) * (ulong)_framesPerSegment + mainSequence % (ulong)_framesPerSegment;
+                int within = (int)(paired / (ulong)members);
+                // Rotate each stripe so fixed unreadable screen positions do not always erase
+                // the same segment when the picture's patch count and group size share a divisor.
+                long chunk = group + (long)((paired % (ulong)members + (ulong)within) % (ulong)members);
+                if (repair)
+                {
+                    // Revisit earlier segments while the main pass continues, including after wrap.
+                    // A dense equation can close small checkpointed gaps without a whole-file wait.
+                    long prefix = round == 0 ? group : _chunks;
+                    chunk = prefix == 0 ? group + (long)(sequence / 10 % (ulong)members) : (long)(sequence / 10 % (ulong)prefix);
+                }
+                int cache = (int)(chunk % _segments.Length);
+                var segment = repair ? _repairSegment : _segments[cache];
+                if (segment == null || segment.Chunk != chunk)
                 {
                     long offset = chunk * StreamingWire.ChunkBytes;
-                    _bytes = _bundle.Read(offset, (int)Math.Min(StreamingWire.ChunkBytes, _bundle.Length - offset));
-                    _encoder = new FountainEncoder(_bytes, _block, BitConverter.ToUInt16(_id, 0));
-                    _hash = StreamingWire.Hash(_bytes); _cached = chunk;
+                    var bytes = _bundle.Read(offset, (int)Math.Min(StreamingWire.ChunkBytes, _bundle.Length - offset));
+                    segment = new Segment { Chunk = chunk, Bytes = bytes, Encoder = new FountainEncoder(bytes, _block, BitConverter.ToUInt16(_id, 0)), Hash = StreamingWire.Hash(bytes) };
+                    if (repair) _repairSegment = segment; else _segments[cache] = segment;
                 }
-                int blocks = _encoder.BlockCount;
-                uint local = within < blocks ? (uint)within : checked((uint)blocks) + unchecked((uint)(round * (ulong)_fullBlocks + (ulong)(within - blocks)) % (uint.MaxValue - (uint)blocks));
+                int blocks = segment.Encoder.BlockCount;
+                uint local = (uint)within;
+                if (repair)
+                {
+                    // Change the equation once per full-bundle repair sweep, regardless of the
+                    // growing prefix. Reuse it across segments rather than search once per packet.
+                    ulong backgroundRound = sequence / 10 / (ulong)_chunks;
+                    if (_backgroundRound != backgroundRound || _backgroundBlocks != blocks)
+                    {
+                        _backgroundRound = backgroundRound; _backgroundBlocks = blocks;
+                        _backgroundFrame = (uint)blocks + DenseSequence(blocks, FountainMath.SolitonCdf(blocks), BitConverter.ToUInt16(_id, 0), unchecked((uint)backgroundRound * 2654435761u) ^ 0xa5a5a5a5u);
+                    }
+                    local = _backgroundFrame;
+                }
+                else if (within >= blocks)
+                {
+                    if (_repairRound != round) { _repairFrames.Clear(); _repairRound = round; }
+                    uint[] repairs;
+                    if (!_repairFrames.TryGetValue(blocks, out repairs))
+                    {
+                        // These are ordinary fountain sequence numbers: an existing receiver derives
+                        // exactly the same coefficients. A dense repair covers small residual gaps
+                        // instead of leaving a few blocks untouched until another whole-file sweep.
+                        repairs = new uint[_framesPerSegment - blocks];
+                        var cdf = FountainMath.SolitonCdf(blocks);
+                        for (int i = 0; i < repairs.Length; i++)
+                        {
+                            repairs[i] = DenseSequence(blocks, cdf, BitConverter.ToUInt16(_id, 0), unchecked((uint)(round * (ulong)_framesPerSegment + (ulong)i) * 2654435761u));
+                        }
+                        _repairFrames.Add(blocks, repairs);
+                    }
+                    local = (uint)blocks + repairs[within - blocks];
+                }
                 var frame = new byte[_frameBytes];
                 frame[0] = 0xd1; frame[1] = 0x0d;
                 StreamingWire.Put(frame, 2, BitConverter.GetBytes(BitConverter.ToUInt16(_id, 0)));
@@ -136,16 +196,28 @@ namespace Xfer
                 StreamingWire.Put(frame, 8, BitConverter.GetBytes(chunk));
                 StreamingWire.Put(frame, 16, BitConverter.GetBytes(_bundle.Length));
                 StreamingWire.Put(frame, 24, _id);
-                StreamingWire.Put(frame, 40, BitConverter.GetBytes(_hash));
+                StreamingWire.Put(frame, 40, BitConverter.GetBytes(segment.Hash));
                 StreamingWire.Put(frame, 44, BitConverter.GetBytes((ushort)_block));
                 if (local < blocks)
-                { int start = (int)local * _block; Buffer.BlockCopy(_bytes, start, frame, StreamingWire.Header, Math.Min(_block, _bytes.Length - start)); }
+                { int start = (int)local * _block; Buffer.BlockCopy(segment.Bytes, start, frame, StreamingWire.Header, Math.Min(_block, segment.Bytes.Length - start)); }
                 else
-                { var block = _encoder.Encode(local - (uint)blocks); Buffer.BlockCopy(block, 0, frame, StreamingWire.Header, block.Length); }
+                { var block = segment.Encoder.Encode(local - (uint)blocks); Buffer.BlockCopy(block, 0, frame, StreamingWire.Header, block.Length); }
                 return frame;
             }
         }
-        public void Dispose() { lock (_gate) { _disposed = true; _bundle.Dispose(); _encoder = null; _bytes = null; } }
+        private static uint DenseSequence(int blocks, double[] cdf, ushort seed, uint candidate)
+        {
+            uint range = uint.MaxValue - (uint)blocks;
+            candidate %= range;
+            int minimum = Math.Max(1, blocks / 3), maximum = Math.Max(minimum, blocks * 2 / 3);
+            while (true)
+            {
+                int degree = FountainMath.FrameIndices(blocks, cdf, seed, candidate).Count;
+                if (degree >= minimum && degree <= maximum) return candidate;
+                candidate = (candidate + 1) % range;
+            }
+        }
+        public void Dispose() { lock (_gate) { _disposed = true; _bundle.Dispose(); Array.Clear(_segments, 0, _segments.Length); _repairSegment = null; _repairFrames.Clear(); } }
     }
 
     internal sealed class StreamingFrame
@@ -173,7 +245,8 @@ namespace Xfer
         }
     }
 
-    // Four live fountain windows. Eviction checkpoints solved blocks to disk, so later sweeps repair gaps
+    // 256 live fountain windows cover the current group of at most 128 segments and late camera workers
+    // from the preceding group. Eviction checkpoints solved blocks to disk, so later sweeps repair gaps
     // without retaining a transfer-sized decoder, bitmap or set of frame numbers in managed memory.
     internal sealed class StreamingReceiver : IDisposable
     {
@@ -212,7 +285,7 @@ namespace Xfer
             Window w;
             if (!_windows.TryGetValue(f.Chunk, out w))
             {
-                if (_windows.Count == 4)
+                if (_windows.Count == 256)
                 {
                     Window oldest = null;
                     foreach (var item in _windows.Values) if (oldest == null || item.Used < oldest.Used) oldest = item;
@@ -262,7 +335,7 @@ namespace Xfer
                 if (BitConverter.ToUInt32(h, 0) != f.Hash) throw new InvalidDataException("The received segment does not match.");
                 if (flag == 2) { w.Complete = true; return w; }
             }
-            w.Decoder = new FountainDecoder(w.Blocks, _block, _session, w.Length);
+            w.Decoder = new FountainDecoder(w.Blocks, _block, _session, w.Length, true);
             if (flag == 1)
             {
                 var flags = new byte[w.Blocks]; StreamingWire.ReadExactly(_map, flags, 0, flags.Length);

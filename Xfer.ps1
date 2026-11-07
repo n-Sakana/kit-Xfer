@@ -122,7 +122,7 @@ function Get-XferCombinedSource {
         [Environment]::NewLine + [Environment]::NewLine + $body
 }
 
-# The Xfer window: MiniUI's engine (runtime\windows-x64) draws ui\index.html, and ui\MiniUI.App.dll beside it
+# The Xfer window: MiniUI's engine (runtime\windows-x64) draws ui\index.html, and ui\app\miniui-app.dll beside it
 # runs Xfer (local server for the phone, QR, camera, file dialogs). Nothing is compiled here.
 function Invoke-XferWindow {
     param([string[]]$Arguments)
@@ -130,7 +130,7 @@ function Invoke-XferWindow {
     $script:launcherStage = 'native.check_runtime'
     $runtime = Join-Path $PSScriptRoot 'runtime\windows-x64'
     $ui = Join-Path $PSScriptRoot 'ui'
-    foreach ($file in @('runtime\windows-x64\MiniUI.Bridge.dll', 'runtime\windows-x64\MiniUI.Engine.dll', 'ui\MiniUI.App.dll')) {
+    foreach ($file in @('runtime\windows-x64\MiniUI.Bridge.dll', 'runtime\windows-x64\MiniUI.Engine.dll', 'ui\app\miniui-app.dll')) {
         if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $file) -PathType Leaf)) {
             throw "Xfer could not find $file."
         }
@@ -155,32 +155,12 @@ function Invoke-XferWindow {
     $script:launcherStage = 'native.load_bridge'
     [void][Reflection.Assembly]::LoadFrom($bridge)
     $appArguments = @('--home', $PSScriptRoot) + @($Arguments)
-    $json = '{"root":' + (ConvertTo-Json -InputObject ([string]$ui) -Compress) +
+    $json = '{"appId":"org.xfer.desktop","root":' + (ConvertTo-Json -InputObject ([string]$ui) -Compress) +
         ',"stateDir":' + (ConvertTo-Json -InputObject ([string]$stateDirectory) -Compress) +
-        ',"title":"Xfer","width":1180,"height":800,"arguments":[' +
+        ',"title":"Xfer","window":{"width":1180,"height":800},"arguments":[' +
         ((@($appArguments) | ForEach-Object { ConvertTo-Json -InputObject ([string]$_) -Compress }) -join ',') + ']}'
     $script:launcherStage = 'native.run_bridge'
-    try {
-        return [MiniUI.Bridge]::Run((Join-Path $ui 'index.html'), $json)
-    }
-    finally {
-        # The precompiled bridge calls native cleanup before the host exits.
-        try {
-            $shutdownBridge = Join-Path $runtime 'Xfer.Launcher.dll'
-            if (Test-Path -LiteralPath $shutdownBridge -PathType Leaf) {
-                [void][Reflection.Assembly]::LoadFrom($shutdownBridge)
-                $shutdownCode = [Xfer.Launcher.NativeShutdown]::Finish((Join-Path $ui 'MiniUI.App.dll'), 2000)
-                Write-XferLauncherLog 'launcher.native_shutdown' @{ code = $shutdownCode; site = 'Invoke-XferWindow.finally' }
-            }
-            else {
-                Write-XferLauncherLog 'launcher.native_shutdown' @{ code = -3; site = 'Invoke-XferWindow.finally' }
-            }
-        }
-        catch {
-            Write-XferLauncherLog 'launcher.native_shutdown.failed' @{ type = $_.Exception.GetType().Name; code = $_.Exception.HResult
-                site = 'Invoke-XferWindow.finally'; line = $_.InvocationInfo.ScriptLineNumber }
-        }
-    }
+    return [MiniUI.Bridge]::Run((Join-Path $ui 'index.html'), $json)
 }
 
 # Runtime DLLs rewritten under %LOCALAPPDATA%\Xfer\runtime: a file written from
@@ -189,7 +169,6 @@ function Get-XferUnmarkedRuntime {
     param([string]$Runtime)
 
     $names = @('MiniUI.Bridge.dll', 'MiniUI.Engine.dll')
-    if (Test-Path -LiteralPath (Join-Path $Runtime 'Xfer.Launcher.dll') -PathType Leaf) { $names += 'Xfer.Launcher.dll' }
     $key = ($names | ForEach-Object {
         $item = Get-Item -LiteralPath (Join-Path $Runtime $_)
         '{0}:{1}:{2}' -f $_, $item.Length, $item.LastWriteTimeUtc.Ticks

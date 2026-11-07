@@ -11,7 +11,7 @@ using ZXing.QrCode.Internal;
 
 namespace Xfer
 {
-    /// <summary>Xfer's native component behind the MiniUI page (uiHost.call and app: images). One JSON request,
+    /// <summary>Xfer's native component behind the MiniUI page (miniui.app.call and imageUrl). One JSON request,
     /// one JSON reply; work that takes time returns a job the page polls. Shared by the Windows DLL and the Linux host.</summary>
     internal sealed partial class NativeApp : IDisposable
     {
@@ -43,6 +43,20 @@ namespace Xfer
         private AutoSendOptions _autoSend;
         private AutoReceiveOptions _autoReceive;
         public bool PresentationFullscreen { get; private set; }
+
+        // The bundled Rust Core accepts 128 MiB. In-process hosts can supply
+        // their renderer's limits before loading the page; BGRA uses four bytes per pixel.
+        private int _imageMaximumSide = 8192;
+        private long _imageMaximumPixels = 128L * 1024 * 1024 / 4;
+
+        public void SetImageLimits(int maximumSide, long maximumPixels)
+        {
+            if (maximumSide < 1 || maximumSide > 16384 || maximumPixels < 1 || maximumPixels > int.MaxValue / 4)
+                throw new ArgumentOutOfRangeException("maximumSide");
+            if (_initialized) throw new InvalidOperationException("Set image limits before initialising Xfer.");
+            _imageMaximumSide = maximumSide;
+            _imageMaximumPixels = maximumPixels;
+        }
 
         public string Call(string input)
         {
@@ -292,10 +306,17 @@ namespace Xfer
                 long total = 0, selectedBytes = 0; int selected = 0;
                 foreach (var file in files) { total += file.Size; if (_selected.Contains(file.Name)) { selected++; selectedBytes += file.Size; } }
                 var page = new List<object>();
+                // ABI v2 call replies are at most 64 KiB. Preserve the existing pagination
+                // contract while fitting long UTF-8 file names into each reply.
+                int pageBytes = 1024 + Encoding.UTF8.GetByteCount(Json(_folder.Path));
                 for (int i = Math.Max(0, offset); i < files.Count && page.Count < FolderPage; i++)
                 {
                     var f = files[i];
-                    page.Add(new { f.Name, f.Size, Modified = f.ModifiedUtc, f.Kind, Selected = _selected.Contains(f.Name) });
+                    var item = new { f.Name, f.Size, Modified = f.ModifiedUtc, f.Kind, Selected = _selected.Contains(f.Name) };
+                    int itemBytes = Encoding.UTF8.GetByteCount(Json(item)) + 1;
+                    if (page.Count > 0 && pageBytes + itemBytes > 60 * 1024) break;
+                    page.Add(item);
+                    pageBytes += itemBytes;
                 }
                 return new
                 {
@@ -415,6 +436,18 @@ namespace Xfer
             Fx2Stream fx2;
             lock (_gate) fx2 = _fx2;
             if (fx2 == null) throw new InvalidOperationException("No Tile display is active.");
+            // Bound the raster before describing it, so the page requests exactly the
+            // image we can deliver. Keep device pixels and cell size intact on larger
+            // screens by using a centred viewport rather than rescaling the data.
+            if (width < 1 || height < 1) throw new ArgumentException("Invalid Tile dimensions.");
+            double fit = Math.Min(1, Math.Min(_imageMaximumSide / (double)width, _imageMaximumSide / (double)height));
+            fit = Math.Min(fit, Math.Sqrt(_imageMaximumPixels / ((double)width * height)));
+            int requestedWidth = width, requestedHeight = height;
+            width = Math.Max(1, (int)Math.Floor(width * fit));
+            height = Math.Max(1, (int)Math.Floor(height * fit));
+            if (width != requestedWidth || height != requestedHeight)
+                Diagnostics.Sample("send.image_viewport", fx2.TransferId, 0,
+                    new { RequestedWidth = requestedWidth, RequestedHeight = requestedHeight, Width = width, Height = height });
             var layout = fx2.Layout(width, height, cell, coarse);
             return new { layout.Width, layout.Height, layout.Patches, Coarse = layout.Coarse, Tiers = layout.Tiers.Length };
         }
@@ -513,7 +546,12 @@ namespace Xfer
                         ulong seq;
                         if (fx2 == null || Query(query, "t") != fx2.Token || !ulong.TryParse(Query(query, "s"), NumberStyles.None, CultureInfo.InvariantCulture, out seq)) return null;
                         int width = Count(query, "w", 16384), height = Count(query, "h", 16384), cell = Count(query, "m", Fx2Layout.MaximumCell), coarse = Count(query, "k", 4);
-                        if ((long)width * height > 64L * 1024 * 1024 / 4) return null;
+                        if (width > _imageMaximumSide || height > _imageMaximumSide || (long)width * height > _imageMaximumPixels)
+                        {
+                            Diagnostics.Sample("send.image_limit", fx2.TransferId, 0, new { Width = width, Height = height,
+                                MaximumSide = _imageMaximumSide, MaximumPixels = _imageMaximumPixels });
+                            return null;
+                        }
                         var layout = fx2.Layout(width, height, cell, coarse);
                         return Keystone(new Fx2Image(fx2.Picture(seq, layout)), query);
                     }

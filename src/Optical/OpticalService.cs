@@ -105,7 +105,7 @@ namespace Xfer
             }
 
             Diagnostics.Event("send.ready", session.TransferId, new { Preparation = preparation, Files = payload.FileCount,
-                OriginalBytes = payload.OriginalBytes, TransmittedBytes = payload.Length,
+                OriginalBytes = payload.OriginalBytes, TransmittedBytes = payload.Length, Streaming = payload.Streaming != null,
                 FrameBytes = frameBytes, Fps = framesPerSecond, Ec = errorCorrection, QrVersion = session.Describe().QrVersion });
             return session.Describe();
         }
@@ -133,7 +133,8 @@ namespace Xfer
                     _sessions.Add(session.Describe().Token, session);
                 }
                 Diagnostics.Event("send.ready", session.TransferId, new { Preparation = preparation, Layout = "fx2", Files = payload.FileCount,
-                    OriginalBytes = payload.OriginalBytes, TransmittedBytes = payload.Length, FrameBytes = session.Describe().FrameBytes, Color = color,
+                    OriginalBytes = payload.OriginalBytes, TransmittedBytes = payload.Length, Streaming = payload.Streaming != null,
+                    FrameBytes = session.Describe().FrameBytes, Color = color,
                     Fps = framesPerSecond, Ec = errorCorrection });
                 return session.Describe();
             }
@@ -1007,7 +1008,9 @@ namespace Xfer
             // These thresholds select a format rather than limit transfer size.
             long measured = 0, metadata = 0;
             foreach (var file in selected) { measured = checked(measured + file.Size); metadata += Encoding.UTF8.GetByteCount(file.Name) + 160L; }
-            if (measured > 8 * 1024 * 1024 || metadata > 512 * 1024 || selected.Count > 2000)
+            if (measured > OpticalTransferLimits.StreamingThresholdBytes
+                || metadata > OpticalTransferLimits.StreamingManifestThresholdBytes
+                || selected.Count > OpticalTransferLimits.MaximumFiles)
             {
                 var stream = new StreamingBundle(source, selectedNames);
                 return new OpticalPayload(stream.Label, stream.FileCount, stream.OriginalBytes, null) { Streaming = stream };
@@ -1022,7 +1025,7 @@ namespace Xfer
                 byte[] bytes;
                 using (var input = File.OpenRead(file.FullPath))
                 {
-                    if (input.Length != file.Size || input.Length > 8 * 1024 * 1024 - total)
+                    if (input.Length != file.Size || input.Length > OpticalTransferLimits.StreamingThresholdBytes - total)
                         throw new IOException("A file changed during transfer preparation.");
                     bytes = new byte[(int)input.Length];
                     StreamingWire.ReadExactly(input, bytes, 0, bytes.Length);
@@ -1030,7 +1033,6 @@ namespace Xfer
                 }
                 Diagnostics.Sample("send.read_file", preparation, Diagnostics.Milliseconds(readStamp), new { Bytes = bytes.Length });
                 total = checked(total + bytes.LongLength);
-                if (total > 8 * 1024 * 1024) throw new IOException("A file changed during transfer preparation.");
                 contents.Add(bytes);
                 manifestFiles.Add(new Dictionary<string, object>
                 {
@@ -1053,7 +1055,7 @@ namespace Xfer
                 { "files", manifestFiles }
             };
             var manifestBytes = JsonCodec.Serialize(manifest);
-            if (manifestBytes.Length > 1024 * 1024)
+            if (manifestBytes.Length > OpticalTransferLimits.MaximumManifestBytes)
             {
                 throw new ArgumentException("The file name list is too large.");
             }
@@ -1072,6 +1074,8 @@ namespace Xfer
 
             Diagnostics.Event("send.bundle.ok", preparation, new { Ms = Diagnostics.Milliseconds(stamp), Bytes = bundle.Length, Files = selected.Count });
             var fileContainer = PackFile(label + ".dcb1", BundleMediaType, bundle, preparation);
+            if (fileContainer.Length > OpticalTransferLimits.MaximumContainerBytes)
+                throw new ArgumentException("The selection exceeds the receiver's buffered transfer limit. Select fewer files.");
             return new OpticalPayload(label, selected.Count, total, fileContainer);
         }
 

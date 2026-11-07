@@ -12,7 +12,6 @@ import base64
 import json
 import os
 import queue
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -142,7 +141,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=str(ROOT / "tests" / "results" / "screens"))
     parser.add_argument("--runtime", default=str(ROOT / "runtime" / "windows-x64"))
-    parser.add_argument("--miniui", default="")
     parser.add_argument("--visible", action="store_true")
     parser.add_argument("--port", default="18495")
     parser.add_argument("--linux", action="store_true")
@@ -151,31 +149,26 @@ def main() -> int:
     runtime = Path(args.runtime)
     work = Path(tempfile.mkdtemp(prefix="xfer-ui-"))
     folder = sample_folder(work)
-    launcher = Path(args.miniui) if args.miniui else None
+    launcher = ROOT / "Xfer.sh"
     if args.linux:
-        launcher = ROOT / "Xfer.sh"
-    if launcher is None:
-        # The test launcher and DLLs are all bundled in Xfer.
-        miniui_cmd = ROOT / "tests" / "miniui.cmd"
-        temp_runtime = work / "runtime"
-        shutil.copytree(runtime, temp_runtime)
-        shutil.copy(miniui_cmd, temp_runtime / "miniui.cmd")
-        launcher = temp_runtime / "miniui.cmd"
-    if args.linux:
-        # The Linux host shows ui/ itself and runs the native component in its own process.
         command = [str(launcher), "--mcp", "--state-dir", str(work / "state"),
                    "--path", str(folder), "--output", str(work / "output"), "--port", args.port]
     else:
-        # MiniUI loads ui/MiniUI.App.dll (Xfer's native component) from beside the start page.
-        command = ["cmd", "/c", str(launcher), str(ROOT / "ui" / "index.html"), "--root", str(ROOT / "ui"),
-                   "--state-dir", str(work / "state"), "--width", "1180", "--height", "760", "--mcp"]
-        if not args.visible:
-            command.append("--headless")
-        command += ["--", "--home", str(ROOT), "--path", str(folder), "--output", str(work / "output"), "--port", args.port]
+        options = {
+            "appId": "org.xfer.desktop", "root": str(ROOT / "ui"), "stateDir": str(work / "state"),
+            "title": "Xfer", "window": {"width": 1180, "height": 800}, "mcp": True,
+            "headless": not args.visible,
+            "arguments": ["--home", str(ROOT), "--path", str(folder), "--output", str(work / "output"), "--port", args.port]
+        }
+        def ps_string(value):
+            return "'" + str(value).replace("'", "''") + "'"
+        script = "[void][Reflection.Assembly]::LoadFrom(" + ps_string(runtime / "MiniUI.Bridge.dll") + ");" + \
+                 "exit [MiniUI.Bridge]::Run(" + ps_string(ROOT / "ui" / "index.html") + "," + ps_string(json.dumps(options)) + ")"
+        command = ["powershell.exe", "-NoProfile", "-STA", "-EncodedCommand", base64.b64encode(script.encode("utf-16le")).decode("ascii")]
     mcp = Mcp(command, out / "ui-drive.log")
     try:
         mcp.start()
-        mcp.wait("sourcePath", text=str(folder))
+        mcp.wait("sourcePath", text=folder.name)
         mcp.pause(0.5)
         for theme in ("dark", "light"):
             mcp.click("navSend"); mcp.pause(0.3)
@@ -199,7 +192,7 @@ def main() -> int:
         mcp.wait("present", visible=True)
         mcp.pause(1.0)
         mcp.shot(out / "present.png")
-        mcp.click("stopQr"); mcp.pause(0.3)
+        mcp.tool("ui_press_key", {"applicationId": mcp.app, "key": "Escape"}); mcp.pause(0.3)
         return 0
     finally:
         mcp.close()

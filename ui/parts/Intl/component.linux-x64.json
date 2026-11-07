@@ -1,0 +1,14 @@
+{
+  "name": "Intl",
+  "abi": 2,
+  "os": "linux",
+  "arch": "x86_64",
+  "sourceCommit": "53b4a051d08364aac8eae9667bab343b9b48404f",
+  "bytes": 146128,
+  "sha256": "49a81671156ca548bbcc572edb8000fcb865b0b2cc0a93521c79d2120e473681",
+  "icuBundled": false,
+  "runtimeDependencies": [
+    "OS ICU 67+ (libicuuc.so.N and libicui18n.so.N)",
+    "OS C/C++ runtime"
+  ]
+}

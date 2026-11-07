@@ -494,8 +494,7 @@ namespace Xfer
         public const int MaximumBlocks = 1 << 20;
         // Bound D1/0C decoding to 64 MiB of content plus DCB1 manifest and DCF2 envelope
         // overhead. The disk-backed D1/0D format is parsed separately.
-        private const int MaximumPayloadLength =
-            (64 * 1024 * 1024) + (1024 * 1024) + (64 * 1024);
+        private const int MaximumPayloadLength = OpticalTransferLimits.MaximumContainerBytes;
 
         private OpticalFrame()
         {
@@ -578,6 +577,8 @@ namespace Xfer
         private readonly int _words;
         private readonly double[] _cdf;
         private readonly uint[][] _solved;
+        private readonly ulong[][] _linearIndices;
+        private readonly uint[][] _linearWords;
         private readonly Dictionary<int, HashSet<PendingFountainFrame>> _byBlock =
             new Dictionary<int, HashSet<PendingFountainFrame>>();
         private readonly HashSet<uint> _seen = new HashSet<uint>();
@@ -586,7 +587,8 @@ namespace Xfer
             int blockCount,
             int blockLength,
             ushort sessionId,
-            int totalLength)
+            int totalLength,
+            bool linear = false)
         {
             _blockCount = blockCount;
             _blockLength = blockLength;
@@ -595,6 +597,7 @@ namespace Xfer
             _words = (blockLength + 3) / 4;
             _cdf = FountainMath.SolitonCdf(blockCount);
             _solved = new uint[blockCount][];
+            if (linear) { _linearIndices = new ulong[blockCount][]; _linearWords = new uint[blockCount][]; }
         }
 
         public int FramesNew { get; private set; }
@@ -621,6 +624,7 @@ namespace Xfer
                 _sessionId,
                 sequence));
             var words = ReadWords(block);
+            if (_linearIndices != null) { AddLinear(indices, words); return; }
             var snapshot = new List<int>(indices);
             foreach (var index in snapshot)
             {
@@ -658,7 +662,43 @@ namespace Xfer
         {
             if (index < 0 || index >= _blockCount || block.Length != _blockLength) throw new ArgumentException("Invalid known block");
             if (_solved[index] != null) { FramesDuplicate++; return; }
-            Resolve(index, ReadWords(block));
+            if (_linearIndices != null) AddLinear(new[] { index }, ReadWords(block));
+            else Resolve(index, ReadWords(block));
+        }
+
+        // Reduced binary equations keep every useful repair in the 64 KiB streaming window.
+        // Sparse peeling alone can stall despite enough independent equations having arrived.
+        private void AddLinear(IEnumerable<int> indices, uint[] words)
+        {
+            var row = new ulong[(_blockCount + 63) / 64];
+            foreach (int index in indices) row[index / 64] |= 1UL << (index % 64);
+            int pivot = -1;
+            for (int i = 0; i < _blockCount; i++)
+            {
+                if ((row[i / 64] & (1UL << (i % 64))) == 0) continue;
+                if (_linearIndices[i] != null)
+                {
+                    for (int k = 0; k < row.Length; k++) row[k] ^= _linearIndices[i][k];
+                    XorInto(words, _linearWords[i]);
+                }
+                else if (pivot < 0) pivot = i;
+            }
+            if (pivot < 0) return;
+            _linearIndices[pivot] = row; _linearWords[pivot] = words;
+            for (int i = 0; i < _blockCount; i++)
+            {
+                var pending = _linearIndices[i];
+                if (pending == null || _solved[i] != null) continue;
+                if (i != pivot && (pending[pivot / 64] & (1UL << (pivot % 64))) != 0)
+                {
+                    for (int k = 0; k < row.Length; k++) pending[k] ^= row[k];
+                    XorInto(_linearWords[i], words);
+                }
+                bool known = true;
+                for (int k = 0; k < pending.Length; k++)
+                    if (pending[k] != (k == i / 64 ? 1UL << (i % 64) : 0)) { known = false; break; }
+                if (known) { _solved[i] = _linearWords[i]; SolvedCount++; }
+            }
         }
 
         public byte[] KnownBlock(int index)
@@ -792,11 +832,10 @@ namespace Xfer
     {
         private const int FileHeaderLength = 49;
         private const int BundleHeaderLength = 8;
-        private const int MaximumPayloadBytes = 64 * 1024 * 1024;
-        private const int MaximumManifestBytes = 1024 * 1024;
-        private const int MaximumContainerBytes =
-            MaximumPayloadBytes + MaximumManifestBytes + (64 * 1024);
-        private const int MaximumFiles = 2000;
+        private const int MaximumPayloadBytes = OpticalTransferLimits.MaximumPayloadBytes;
+        private const int MaximumManifestBytes = OpticalTransferLimits.MaximumManifestBytes;
+        private const int MaximumContainerBytes = OpticalTransferLimits.MaximumContainerBytes;
+        private const int MaximumFiles = OpticalTransferLimits.MaximumFiles;
         private const string BundleMediaType = "application/vnd.decimen.bundle+dcb1";
         private static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
 

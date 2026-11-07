@@ -1,15 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Xfer's native component for the MiniUI Windows host: a Native AOT DLL exporting miniui_call and
-       miniui_image. It runs Xfer's local server, optical send/receive, camera and file dialogs. -->
+  <!-- Xfer's native component for the Linux and Windows MiniUI hosts: an ABI v2 Native AOT library. It runs Xfer's local server, optical send/receive, camera and file dialogs. -->
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <AssemblyName>Xfer.Native</AssemblyName>
+    <AssemblyName>miniui-app</AssemblyName>
     <RootNamespace>Xfer</RootNamespace>
     <OutputType>Library</OutputType>
     <PublishAot>true</PublishAot>
     <NativeLib>Shared</NativeLib>
     <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">linux-x64</RuntimeIdentifier>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -23,11 +22,16 @@
     <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))=/_/Xfer</PathMap>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="../src/**/*.cs" Exclude="../src/Common/NativePicker.cs" />
-    <Compile Include="*.cs;Windows/*.cs" />
+    <Compile Include="*.cs" />
+    <Compile Include="Windows/*.cs" Exclude="Windows/Exports.cs" Condition="'$(RuntimeIdentifier)' == 'win-x64'" />
+    <Compile Include="Linux/*.cs;../src/Common/NativePicker.cs" Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
     <Reference Include="zxing"><HintPath>../lib/zxing.dll</HintPath></Reference>
     <!-- JsonCodec serialises result objects by reflection: keep this assembly's metadata. -->
-    <TrimmerRootAssembly Include="Xfer.Native" />
+    <TrimmerRootAssembly Include="miniui-app" />
   </ItemGroup>
 </Project>
